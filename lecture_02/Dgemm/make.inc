@@ -3,7 +3,7 @@
 	FORT      = ftn
 
 	OPTS      = -O3 
-	OPTS     += -mkl
+	OPTS     += -qmkl
   OPTS     += -no-multibyte-chars
 
 	#LIB       = -lm -lgfortran 
