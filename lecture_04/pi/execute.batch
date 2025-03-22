@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=2
+#SBATCH --cpus-per-task=1
+#SBATCH --time=01:30:00
+#SBATCH --qos=parallel
+#SBATCH --account=math-454
+#SBATCH --output=/dev/null
+
+compiler=$1
+prog_name=$2
+
+module purge
+module load gcc openmpi
+make CXX=$compiler MAIN=$prog_name
+srun --output=./logs/$prog_name.out --error=./logs/$prog_name.err ./build/$prog_name 
+
