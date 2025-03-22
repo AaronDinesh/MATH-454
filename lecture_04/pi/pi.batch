@@ -1,0 +1,7 @@
+#!/bin/bash
+#SBATCH --qos=math-454
+#SBATCH --account=math-454
+#SBATCH -n <ntasks>
+module purge
+module load gcc openmpi
+srun _pi

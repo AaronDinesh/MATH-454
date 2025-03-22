@@ -1,34 +1,38 @@
-OPTIM+=-O3 -march=native
+# Compiler and Linker (defaults to g++, can be overridden)
+CXX ?= g++
+LD := $(CXX)
 
-# No MPI with gcc. You have to load the module gcc
-CXX=g++
-CC=g++
+# The Target Binary Program (defaults to main)
+MAIN ?= main
+TARGET := build/$(MAIN)
 
-# MPI with gcc. You have to load the modules gcc and openmpi
-# CXX=mpicxx
-# CC=mpicxx
+# The Directories, Source, Includes, Objects, and Defines
+BUILD_DIR := build
+SRCEXT := cc
+SOURCES := $(shell find . -type f -name '$(MAIN).$(SRCEXT)')
+OBJECTS := $(patsubst ./%, $(BUILD_DIR)/%, $(SOURCES:.$(SRCEXT)=.o))
+CFLAGS := -Wall -O3 -std=c++17
+INC := 
+LIB := 
+LDFLAGS := $(LIB)
 
+# Default Make
+all: $(TARGET)
 
-# # No MPI with intel. You have to load the module intel
-# CXX=icpc
-# CC=icc
-# This line below is required by intel compiler in the server
-# CXXFLAGS+=-no-multibyte-chars
+# Link
+$(TARGET): $(OBJECTS)
+	@mkdir -p $(dir $@)
+	$(LD) -o $@ $^ $(LDFLAGS)
+	@rm -f $(OBJECTS)
 
-# # MPI with intel. You have to load the modules intel and intel-oneapi-mpi
-# CXX=mpiicpc
-# CC=mpiicc
-# # This line below is required by intel compiler in the server
-# CXXFLAGS+=-no-multibyte-chars
-
-
-
-LD=${CXX}
-CXXFLAGS+=-Wall -Wextra -std=c++11 $(OPTIM)
-# LDFLAGS+=-lm
-EXE=pi
-
-all: clean $(EXE)
-
+# Compile
+$(BUILD_DIR)/%.o: %.cc
+	@mkdir -p $(dir $@)
+	$(CXX) $(CFLAGS) $(INC) -c -o $@ $<
+# Clean only objects and the binary
 clean:
-	rm -f $(EXE) *.o *~
+	rm -rf $(BUILD_DIR)
+
+# Non-File Targets
+.PHONY: all clean
+
