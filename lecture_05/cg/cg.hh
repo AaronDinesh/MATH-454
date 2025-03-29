@@ -2,6 +2,7 @@
 #include <cblas.h>
 #include <string>
 #include <vector>
+#include <mpi.h>
 
 #ifndef __CG_HH__
 #define __CG_HH__
@@ -19,9 +20,10 @@ class Solver
 {
 public:
   virtual void read_matrix(const std::string &filename) = 0;
+  virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm) = 0;
   void init_source_term(double h);
-  virtual void solve(std::vector<double> &x) = 0;
-
+  virtual void solve(std::vector<double> &x, MPI_Comm comm) = 0;
+  
   inline int m() const
   {
     return m_m;
@@ -30,25 +32,26 @@ public:
   {
     return m_n;
   }
-
+  
   void tolerance(double tolerance)
   {
     m_tolerance = tolerance;
   }
-
+  
 protected:
-  int m_m{0};
-  int m_n{0};
+int m_m{0};
+int m_n{0};
   std::vector<double> m_b;
   double m_tolerance{1e-10};
 };
 
 class CGSolverSparse : public Solver
 {
-public:
+  public:
   CGSolverSparse() = default;
   virtual void read_matrix(const std::string &filename);
-  virtual void solve(std::vector<double> &x);
+  virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm);
+  virtual void solve(std::vector<double> &x, MPI_Comm comm);
 
 private:
   MatrixCOO m_A;

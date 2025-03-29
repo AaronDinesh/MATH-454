@@ -4,6 +4,7 @@
 #include <cblas.h>
 #include <cmath>
 #include <iostream>
+#include <mpi.h>
 
 const double NEARZERO = 1.0e-14;
 const bool DEBUG = false;
@@ -39,42 +40,47 @@ end
 Sparse version of the cg solver
 */
 void
-CGSolverSparse::solve(std::vector<double> &x)
-{
-  std::vector<double> r(m_n);
-  std::vector<double> p(m_n);
-  std::vector<double> Ap(m_n);
+CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
+  std::vector<double> r_global(m_n);
+  std::vector<double> p_global(m_n);
+  std::vector<double> Ap_global(m_n);
   std::vector<double> tmp(m_n);
+  std::vector<double> Ap_local(m_n);
 
   // r = b - A * x;
-  m_A.mat_vec(x, Ap);
-  r = m_b;
-  cblas_daxpy(m_n, -1., Ap.data(), 1, r.data(), 1);
+  m_A.mat_vec(x, Ap_local);
+
+  MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+
+  r_global = m_b;
+  cblas_daxpy(m_n, -1., Ap_global.data(), 1, r_global.data(), 1);
 
   // p = r;
-  p = r;
+  p_global = r_global;
 
   // rsold = r' * r;
-  auto rsold = cblas_ddot(m_n, r.data(), 1, r.data(), 1);
+  auto rsold = cblas_ddot(m_n, r_global.data(), 1, r_global.data(), 1);
 
   // for i = 1:length(b)
   int k = 0;
   for (; k < m_n; ++k)
   {
     // Ap = A * p;
-    m_A.mat_vec(p, Ap);
+    m_A.mat_vec(p_global, Ap_local);
+
+    MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
 
     // alpha = rsold / (p' * Ap);
-    auto alpha = rsold / std::max(cblas_ddot(m_n, p.data(), 1, Ap.data(), 1), rsold * NEARZERO);
+    auto alpha = rsold / std::max(cblas_ddot(m_n, p_global.data(), 1, Ap_global.data(), 1), rsold * NEARZERO);
 
     // x = x + alpha * p;
-    cblas_daxpy(m_n, alpha, p.data(), 1, x.data(), 1);
+    cblas_daxpy(m_n, alpha, p_global.data(), 1, x.data(), 1);
 
     // r = r - alpha * Ap;
-    cblas_daxpy(m_n, -alpha, Ap.data(), 1, r.data(), 1);
+    cblas_daxpy(m_n, -alpha, Ap_global.data(), 1, r_global.data(), 1);
 
     // rsnew = r' * r;
-    auto rsnew = cblas_ddot(m_n, r.data(), 1, r.data(), 1);
+    auto rsnew = cblas_ddot(m_n, r_global.data(), 1, r_global.data(), 1);
 
     // if sqrt(rsnew) < 1e-10
     //   break;
@@ -83,9 +89,9 @@ CGSolverSparse::solve(std::vector<double> &x)
 
     auto beta = rsnew / rsold;
     // p = r + (rsnew / rsold) * p;
-    tmp = r;
-    cblas_daxpy(m_n, beta, p.data(), 1, tmp.data(), 1);
-    p = tmp;
+    tmp = r_global;
+    cblas_daxpy(m_n, beta, p_global.data(), 1, tmp.data(), 1);
+    p_global = tmp;
 
     // rsold = rsnew;
     rsold = rsnew;
@@ -96,21 +102,27 @@ CGSolverSparse::solve(std::vector<double> &x)
   }
 
   if (DEBUG)
-  {
-    m_A.mat_vec(x, r);
-    cblas_daxpy(m_n, -1., m_b.data(), 1, r.data(), 1);
+  { 
+    std::vector<double> r_local(m_n);
+    m_A.mat_vec(x, r_local);
+    MPI_Allreduce(r_local.data(), r_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+    cblas_daxpy(m_n, -1., m_b.data(), 1, r_global.data(), 1);
     auto res =
-      std::sqrt(cblas_ddot(m_n, r.data(), 1, r.data(), 1)) / std::sqrt(cblas_ddot(m_n, m_b.data(), 1, m_b.data(), 1));
+      std::sqrt(cblas_ddot(m_n, r_global.data(), 1, r_global.data(), 1)) / std::sqrt(cblas_ddot(m_n, m_b.data(), 1, m_b.data(), 1));
     auto nx = std::sqrt(cblas_ddot(m_n, x.data(), 1, x.data(), 1));
     std::cout << "\t[STEP " << k << "] residual = " << std::scientific << std::sqrt(rsold) << ", ||x|| = " << nx
               << ", ||Ax - b||/||b|| = " << res << std::endl;
   }
 }
 
-void
-CGSolverSparse::read_matrix(const std::string &filename)
-{
+void CGSolverSparse::read_matrix(const std::string &filename){
   m_A.read(filename);
+  m_m = m_A.m();
+  m_n = m_A.n();
+}
+
+void CGSolverSparse::read_matrix_distributed(const std::string& filename, MPI_Comm comm){
+  m_A.read_distributed(filename, comm);
   m_m = m_A.m();
   m_n = m_A.n();
 }
