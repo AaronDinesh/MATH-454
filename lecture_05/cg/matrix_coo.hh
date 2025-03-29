@@ -17,23 +17,15 @@ public:
 
   void read(const std::string & filename);
 
-  void mat_vec(const std::vector<double> & x, std::vector<double> & y) {
-    std::fill_n(y.begin(), y.size(), 0.);
+  //Takes in a vector x and multiplies it with the matrixCOO A and assigns it to result
+  void mat_vec(const std::vector<double>& x, std::vector<double>& result);
+  void read_distributed(const std::string& filename, MPI_Comm comm);
 
-    for (size_t z = 0; z < irn.size(); ++z) {
-      auto i = irn[z];
-      auto j = jcn[z];
-      auto a_ = a[z];
-
-      y[i] += a_ * x[j];
-      if (m_is_sym and (i != j)) {
-        y[j] += a_ * x[i];
-      }
-    }
-  }
-
+  //Contains the row indices
   std::vector<int> irn;
+  //Contains the column indices
   std::vector<int> jcn;
+  //Contains the actual values
   std::vector<double> a;
 
 private:
