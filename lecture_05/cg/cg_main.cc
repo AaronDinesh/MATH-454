@@ -1,4 +1,3 @@
-#define OMPI_SKIP_MPICXX
 #include "cg.hh"
 #include <chrono>
 #include <iostream>

@@ -16,45 +16,43 @@ void MatrixCSR::mvm(const std::vector<double> & x, std::vector<double> & y)
 const void MatrixCSR::loadMMMatrix(const std::string & filename) void
 Solver::init_source_term(int n, double h)
 */
-class Solver
-{
-public:
-  virtual void read_matrix(const std::string &filename) = 0;
-  virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm) = 0;
-  void init_source_term(double h);
-  virtual void solve(std::vector<double> &x, MPI_Comm comm) = 0;
+class Solver{
+  public:
+    virtual void read_matrix(const std::string &filename) = 0;
+    virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm) = 0;
+    void init_source_term(double h);
+    virtual void solve(std::vector<double> &x, MPI_Comm comm) = 0;
   
-  inline int m() const
-  {
-    return m_m;
-  }
-  inline int n() const
-  {
-    return m_n;
-  }
+    inline int m() const
+    {
+      return m_m;
+    }
+    inline int n() const
+    {
+      return m_n;
+    }
   
-  void tolerance(double tolerance)
-  {
-    m_tolerance = tolerance;
-  }
+    void tolerance(double tolerance)
+    {
+      m_tolerance = tolerance;
+    }
   
-protected:
-int m_m{0};
-int m_n{0};
-  std::vector<double> m_b;
-  double m_tolerance{1e-10};
+  protected:
+    int m_m{0};
+    int m_n{0};
+    std::vector<double> m_b;
+    double m_tolerance{1e-10};
 };
 
-class CGSolverSparse : public Solver
-{
+class CGSolverSparse : public Solver{
   public:
-  CGSolverSparse() = default;
-  virtual void read_matrix(const std::string &filename);
-  virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm);
-  virtual void solve(std::vector<double> &x, MPI_Comm comm);
+    CGSolverSparse() = default;
+    virtual void read_matrix(const std::string &filename);
+    virtual void read_matrix_distributed(const std::string& filename, MPI_Comm comm);
+    virtual void solve(std::vector<double> &x, MPI_Comm comm);
 
-private:
-  MatrixCOO m_A;
+  private:
+    MatrixCOO m_A;
 };
 
 #endif /* __CG_HH__ */

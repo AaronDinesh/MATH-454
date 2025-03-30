@@ -1,5 +1,4 @@
 #include "cg.hh"
-
 #include <algorithm>
 #include <cblas.h>
 #include <cmath>
@@ -7,7 +6,7 @@
 #include <mpi.h>
 
 const double NEARZERO = 1.0e-14;
-const bool DEBUG = false;
+const bool DEBUG = true;
 
 /*
     cgsolver solves the linear equation A*x = b where A is
@@ -46,12 +45,19 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   std::vector<double> Ap_global(m_n);
   std::vector<double> tmp(m_n);
   std::vector<double> Ap_local(m_n);
-
+  
   // r = b - A * x;
   m_A.mat_vec(x, Ap_local);
+  
+  //? Insteadd of reducing here we can keep Ap distributed locally and then only reduce r
+  //MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+  
+  // std::vector<double> r_local(m_n);
+  // r_local = m_b;
+  // cblas_daxpy(m_n, -1., Ap_local.data(), 1, r_local.data(), 1); 
+  // MPI_Allreduce(r_local.data(), r_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
 
-  MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
-
+  //? Instead of computing r on all processes we can call daxpy on all processes and then reduce.
   r_global = m_b;
   cblas_daxpy(m_n, -1., Ap_global.data(), 1, r_global.data(), 1);
 
@@ -130,9 +136,7 @@ void CGSolverSparse::read_matrix_distributed(const std::string& filename, MPI_Co
 /*
 Initialization of the source term b
 */
-void
-Solver::init_source_term(double h)
-{
+void Solver::init_source_term(double h){
   m_b.resize(m_n);
 
   for (int i = 0; i < m_n; i++)
