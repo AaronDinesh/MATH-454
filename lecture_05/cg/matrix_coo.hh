@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <mpi.h>
 
 #ifndef __MATRIX_COO_H_
 #define __MATRIX_COO_H_

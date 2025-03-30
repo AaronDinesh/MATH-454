@@ -78,8 +78,8 @@ void MatrixCOO::read_distributed(const std::string& filename, MPI_Comm comm) {
     int *I_raw, *J_raw;
     double *val_raw;
     MM_typecode matcode;
-    int ret_code;
-    FILE* f;
+    // int ret_code;
+    // FILE* f;
 
     // if ((f = fopen(filename.c_str(), "r")) == NULL) {
     //   printf("Could not open matrix");
