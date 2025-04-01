@@ -50,7 +50,7 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   m_A.mat_vec(x, Ap_local);
   
   //? Insteadd of reducing here we can keep Ap distributed locally and then only reduce r
-  //MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+  MPI_Allreduce(Ap_local.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
   
   // std::vector<double> r_local(m_n);
   // r_local = m_b;
