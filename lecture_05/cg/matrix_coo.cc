@@ -78,6 +78,7 @@ void MatrixCOO::read_distributed(const std::string& filename, MPI_Comm comm) {
     int *I_raw, *J_raw;
     double *val_raw;
     MM_typecode matcode;
+
     // int ret_code;
     // FILE* f;
 
@@ -104,12 +105,17 @@ void MatrixCOO::read_distributed(const std::string& filename, MPI_Comm comm) {
 
     int status = mm_read_mtx_crd(const_cast<char *>(filename.c_str()), &m_m, &m_n, &nz, &I_raw, &J_raw, &val_raw, &matcode);
     
+    if(nz <= size){
+      fprintf(stderr, "Error: There are more MPI nodes than there are matrix values. Reduce the number of nodes and run again. The number of nodes should be strictly less than the number of matrix values\n");
+      MPI_Abort(comm, MPI_ERR_SIZE);
+    }
+
     //Checks if the matrix is symmetric
     m_is_sym = mm_is_symmetric(matcode);
 
     if (status != 0) {
       fprintf(stderr, "Error: Failed to read Matrix Market file '%s'\n", filename.c_str());
-      MPI_Abort(comm, status);
+      MPI_Abort(comm,  MPI_ERR_NO_SUCH_FILE);
     }
 
     I.assign(I_raw, I_raw + nz);
