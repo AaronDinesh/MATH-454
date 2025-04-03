@@ -7,6 +7,7 @@ extern "C" {
 #include <functional>
 #include <algorithm>
 #include <stddef.h>
+#include <iostream>
 
 void MatrixCOO::read(const std::string & fn) {
   int nz;
@@ -49,7 +50,13 @@ void MatrixCOO::read(const std::string & fn) {
     int I, J;
     double a_;
 
-    fscanf(f, "%d %d %lg\n", &I, &J, &a_);
+    int len =  fscanf(f, "%d %d %lg\n", &I, &J, &a_);
+
+    if(len < 0){
+      std::cerr << "Error reading matrix" << std::endl;
+      MPI_Finalize();
+    }
+
     I--; /* adjust from 1-based to 0-based */
     J--;
 
@@ -145,7 +152,7 @@ void MatrixCOO::read_distributed(const std::string& filename, MPI_Comm comm) {
 
 
   }
-
+  //TODO: Pack and send all this data over persistent comms for better efficiency
   //All the other processes will wait here until rank 0 finishes the reading.
   //Send all the required data in preparation for ScatterV  
   MPI_Bcast(&m_m, 1, MPI_INT, 0, comm);
@@ -194,7 +201,8 @@ MatrixCOO MatrixCOO::operator-(const MatrixCOO& rhs) {
   //The resulting matrix is only symmetric if both matrices are
   res.m_is_sym = m_is_sym & rhs.m_is_sym;
 
-  int i, j = 0;
+  int i =0;
+  int j = 0;
 
   // Go over the main body of the coordinate arrays
   while(i < static_cast<int>(this->a.size()) && j < static_cast<int>(rhs.a.size())){
@@ -246,7 +254,8 @@ MatrixCOO MatrixCOO::operator+(const MatrixCOO& rhs) {
   res.m_n = m_n;
   res.m_is_sym = m_is_sym & rhs.m_is_sym;
 
-  int i, j = 0;
+  int i = 0;
+  int j = 0;
 
   // Go over the main body of the coordinate arrays
   while(i < static_cast<int>(this->a.size()) && j < static_cast<int>(rhs.a.size())){

@@ -18,7 +18,6 @@ public:
 
   void read(const std::string & filename);
 
-  //TODO: Add support for more sparse operations here
 
   //Takes in a vector x and multiplies it with the matrixCOO A and assigns it to result
   void mat_vec(const std::vector<double>& x, std::vector<double>& result);
