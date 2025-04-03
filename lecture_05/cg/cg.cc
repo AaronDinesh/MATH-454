@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <mpi.h>
+#include <cassert>
 
 const double NEARZERO = 1.0e-14;
 const bool DEBUG = true;
@@ -90,26 +91,28 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   // p = r;
   //p_global = r_global;
   MPI_Allgatherv(r_local.data(), local_mn_counts[rank], MPI_DOUBLE, p_global.data(), local_mn_counts.data(), local_mn_displacements.data(), MPI_DOUBLE, comm);
-
+  r_global = p_global;
   
+  //! CODE WORKS UNTIL THIS COMMENT
 
   // rsold = r' * r;
-  double rsold_local = cblas_ddot(local_mn_counts[rank], r_local.data(), 1, r_local.data(), 1);
-  double rsold_global;
-  MPI_Allreduce(&rsold_local, &rsold_global, 1, MPI_DOUBLE, MPI_SUM, comm);
-  
+  double rsold_global = cblas_ddot(p_global.size(), p_global.data(), 1, p_global.data(), 1);
   // for i = 1:length(b)
   int k = 0;
   for (; k < m_n; ++k)
   {
     // Ap = A * p;
-    mat_vec_partial_product.clear();
-    Ap_local.clear();
     m_A.mat_vec(p_global, mat_vec_partial_product);
 
-    MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
-    double dot_prod_result = cblas_ddot(local_mn_counts[rank], Ap_local.data(), 1, p_global.data(), 1);
-    MPI_Allreduce(&dot_prod_result, &dot_prod_result, 1, MPI_DOUBLE, MPI_SUM, comm);
+    MPI_Allreduce(mat_vec_partial_product.data(), Ap_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+
+
+    //MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
+    // double dot_prod_result = cblas_ddot(local_mn_counts[rank], Ap_local.data(), 1, p_global.data(), 1);
+    // MPI_Allreduce(&dot_prod_result, &dot_prod_result, 1, MPI_DOUBLE, MPI_SUM, comm);
+
+    double dot_prod_result = cblas_ddot(m_n, Ap_global.data(), 1, p_global.data(), 1);
+    
     
     // alpha = rsold / (p' * Ap);
     //auto alpha = rsold_global / std::max(cblas_ddot(m_n, p_global.data(), 1, Ap_global.data(), 1), rsold_global * NEARZERO);
@@ -137,7 +140,7 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
 
     // rsold = rsnew;
     rsold_global = rsnew;
-    if (DEBUG)
+    if (DEBUG && rank == 0)
     {
       std::cout << "\t[STEP " << k << "] residual = " << std::scientific << std::sqrt(rsold_global) << "\r" << std::flush;
     }
@@ -145,12 +148,13 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
 
   if (DEBUG)
   { 
-    std::vector<double> r_local(m_n);
-    m_A.mat_vec(x, r_local);
-    MPI_Allreduce(r_local.data(), r_global.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
-    cblas_daxpy(m_n, -1., m_b.data(), 1, r_global.data(), 1);
+    std::vector<double> r_local_debug(m_n);
+    std::vector<double> r_global_debug(m_n);
+    m_A.mat_vec(x, r_local_debug);
+    MPI_Allreduce(r_local_debug.data(), r_global_debug.data(), m_n, MPI_DOUBLE, MPI_SUM, comm);
+    cblas_daxpy(m_n, -1., m_b.data(), 1, r_global_debug.data(), 1);
     auto res =
-      std::sqrt(cblas_ddot(m_n, r_global.data(), 1, r_global.data(), 1)) / std::sqrt(cblas_ddot(m_n, m_b.data(), 1, m_b.data(), 1));
+      std::sqrt(cblas_ddot(m_n, r_global_debug.data(), 1, r_global_debug.data(), 1)) / std::sqrt(cblas_ddot(m_n, m_b.data(), 1, m_b.data(), 1));
     auto nx = std::sqrt(cblas_ddot(m_n, x.data(), 1, x.data(), 1));
     std::cout << "\t[STEP " << k << "] residual = " << std::scientific << std::sqrt(rsold_global) << ", ||x|| = " << nx
               << ", ||Ax - b||/||b|| = " << res << std::endl;
