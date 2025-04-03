@@ -197,7 +197,7 @@ MatrixCOO MatrixCOO::operator-(const MatrixCOO& rhs) {
   int i, j = 0;
 
   // Go over the main body of the coordinate arrays
-  while(i < static_cast<int> this->a.size() && j < rhs.a.size()){
+  while(i < static_cast<int>(this->a.size()) && j < static_cast<int>(rhs.a.size())){
     if(this->irn[i] == rhs.irn[j] && this->jcn[i] == rhs.jcn[j]){
       res.irn.push_back(this->irn[i]);
       res.jcn.push_back(this->jcn[i]);
@@ -218,14 +218,14 @@ MatrixCOO MatrixCOO::operator-(const MatrixCOO& rhs) {
   }
 
   //The next two while loops are just to handle the remaining elements from both matrices if there are any
-  while(i < this->a.size()){
+  while(i < static_cast<int>(this->a.size())){
     res.irn.push_back(this->irn[i]);
     res.jcn.push_back(this->jcn[i]);
     res.a.push_back(this->a[i]);
     i++;
   }
 
-  while(j < rhs.a.size()){
+  while(j < static_cast<int>(rhs.a.size())){
     res.irn.push_back(rhs.irn[j]);
     res.jcn.push_back(rhs.jcn[j]);
     res.a.push_back(-rhs.a[j]);
@@ -249,7 +249,7 @@ MatrixCOO MatrixCOO::operator+(const MatrixCOO& rhs) {
   int i, j = 0;
 
   // Go over the main body of the coordinate arrays
-  while(i < this->a.size() && j < rhs.a.size()){
+  while(i < static_cast<int>(this->a.size()) && j < static_cast<int>(rhs.a.size())){
     if(this->irn[i] == rhs.irn[j] && this->jcn[i] == rhs.jcn[j]){
       res.irn.push_back(this->irn[i]);
       res.jcn.push_back(this->jcn[i]);
@@ -270,14 +270,14 @@ MatrixCOO MatrixCOO::operator+(const MatrixCOO& rhs) {
   }
 
   //The next two while loops are just to handle the remaining elements from both matrices if there are any
-  while(i < this->a.size()){
+  while(i < static_cast<int>(this->a.size())){
     res.irn.push_back(this->irn[i]);
     res.jcn.push_back(this->jcn[i]);
     res.a.push_back(this->a[i]);
     i++;
   }
 
-  while(j < rhs.a.size()){
+  while(j < static_cast<int>(rhs.a.size())){
     res.irn.push_back(rhs.irn[j]);
     res.jcn.push_back(rhs.jcn[j]);
     res.a.push_back(rhs.a[j]);
