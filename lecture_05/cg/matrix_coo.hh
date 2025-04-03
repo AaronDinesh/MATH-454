@@ -23,7 +23,8 @@ public:
   //Takes in a vector x and multiplies it with the matrixCOO A and assigns it to result
   void mat_vec(const std::vector<double>& x, std::vector<double>& result);
   void read_distributed(const std::string& filename, MPI_Comm comm);
-
+  MatrixCOO operator-(const MatrixCOO& rhs);
+  MatrixCOO operator+(const MatrixCOO& rhs);
 
 
 
