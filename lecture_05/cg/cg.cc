@@ -93,22 +93,22 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   double rsold_local = cblas_ddot(local_mn_counts[rank], r_local.data(), 1, r_local.data(), 1);  
   double rsold_global;
   MPI_Request request1;
-  MPI_Request request2;
   
   MPI_Iallreduce(&rsold_local, &rsold_global, 1, MPI_DOUBLE, MPI_SUM, comm, &request1);
-
   
-
+  #ifdef DEBUG
+    MPI_Request request2;
+  #endif 
   // for i = 1:length(b)
   int k = 0;
   for (; k < m_n; ++k){
     MPI_Allgatherv(p_local.data(), local_mn_counts[rank], MPI_DOUBLE, p_global.data(), local_mn_counts.data(), local_mn_displacements.data(), MPI_DOUBLE, comm);
-
+    
     // Ap = A * p;
     m_A.mat_vec(p_global, mat_vec_partial_product);
     MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
-
-
+    
+    
     double local_dot_prod_result = cblas_ddot(local_mn_counts[rank], Ap_local.data(), 1, p_local.data(), 1);
     double global_dot_prod_result;
     MPI_Allreduce(&local_dot_prod_result, &global_dot_prod_result, 1, MPI_DOUBLE, MPI_SUM, comm);
@@ -117,7 +117,7 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
     //auto alpha = rsold_global / std::max(cblas_ddot(m_n, p_global.data(), 1, Ap_global.data(), 1), rsold_global * NEARZERO);
     MPI_Wait(&request1, MPI_STATUS_IGNORE);
     double alpha = rsold_global / std::max(global_dot_prod_result, rsold_global * NEARZERO);
-
+    
     // x = x + alpha * p;
     cblas_daxpy(local_mn_counts[rank], alpha, p_local.data(), 1, &x[local_mn_displacements[rank]], 1);
     
