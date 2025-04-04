@@ -150,25 +150,100 @@ void MatrixCOO::read_distributed(const std::string& filename, MPI_Comm comm) {
       displacements[i] = (i == 0) ? 0 : displacements[i - 1] + counts[i - 1];
     }
 
-
   }
-  //TODO: Pack and send all this data over persistent comms for better efficiency
-  //All the other processes will wait here until rank 0 finishes the reading.
-  //Send all the required data in preparation for ScatterV  
-  MPI_Bcast(&m_m, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&m_n, 1, MPI_INT, 0, comm);
-  MPI_Bcast(&nz , 1, MPI_INT, 0, comm);
-  MPI_Bcast(counts.data(), size, MPI_INT, 0, comm);
-  MPI_Bcast(displacements.data(), size, MPI_INT, 0, comm);
-  MPI_Bcast(&m_is_sym, 1, MPI_CXX_BOOL, 0, comm);
+
+  //Processor 0 needs to pack all the data and send it out
+  int packed_meta_size = 0;
+  int packed_bool_size = 0;
+  int counts_disp_size = 0;
+  MPI_Pack_size(3, MPI_INT, comm, &packed_meta_size);
+  MPI_Pack_size(1, MPI_CXX_BOOL, comm, &packed_bool_size);
+  MPI_Pack_size(2 * size, MPI_INT, comm, &counts_disp_size);
+
+  int meta_buf_size = packed_meta_size + packed_bool_size + counts_disp_size;
+  std::vector<char> meta_buffer(meta_buf_size);
+  int meta_pos = 0;
+
+  if (rank == 0){
+    // == 3 Ints ==
+    MPI_Pack(&m_m, 1, MPI_INT, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+    MPI_Pack(&m_n, 1, MPI_INT, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+    MPI_Pack(&nz, 1, MPI_INT, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+    
+    // == 2 arrays of size mpi-size ==
+    MPI_Pack(counts.data(), size, MPI_INT, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+    MPI_Pack(displacements.data(), size, MPI_INT, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+    
+    // == 1 bool ==
+    MPI_Pack(&m_is_sym, 1, MPI_CXX_BOOL, meta_buffer.data(), meta_buf_size, &meta_pos, comm);
+  }
+
+  //Broadcast the data
+  MPI_Bcast(meta_buffer.data(), meta_pos, MPI_PACKED, 0, comm);
+
+  // Unpack all the data
+  int unpack_pos = 0;
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, &m_m, 1, MPI_INT, comm);
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, &m_n, 1, MPI_INT, comm);
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, &nz , 1, MPI_INT, comm);
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, counts.data(), size, MPI_INT, comm);
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, displacements.data(), size, MPI_INT, comm);
+  MPI_Unpack(meta_buffer.data(), meta_pos, &unpack_pos, &m_is_sym, 1, MPI_CXX_BOOL, comm);
 
   irn.resize(counts[rank]);
   jcn.resize(counts[rank]);
   a.resize(counts[rank]);
 
-  MPI_Scatterv(I.data(), counts.data(), displacements.data(), MPI_INT, irn.data(), counts[rank], MPI_INT, 0, comm);
-  MPI_Scatterv(J.data(), counts.data(), displacements.data(), MPI_INT, jcn.data(), counts[rank], MPI_INT, 0, comm);
-  MPI_Scatterv(val.data(), counts.data(), displacements.data(), MPI_DOUBLE, a.data(), counts[rank], MPI_DOUBLE, 0, comm);
+  int int_size = 0;
+  int double_size = 0;
+  MPI_Pack_size(1, MPI_INT, comm, &int_size);
+  MPI_Pack_size(1, MPI_DOUBLE, comm, &double_size);
+  int per_entry_size = 2 * int_size + double_size;
+
+  //send_counts is the number of bytes we send to each processor
+  std::vector<int> send_counts(size), send_displs(size);
+  //This is the raw array of bytes
+  std::vector<char> send_buffer;
+
+  if (rank == 0) {
+    for (int i = 0; i < size; ++i)
+      send_counts[i] = counts[i] * per_entry_size;
+
+    send_displs[0] = 0;
+    for (int i = 1; i < size; ++i)
+      send_displs[i] = send_displs[i - 1] + send_counts[i - 1];
+
+    send_buffer.resize(send_displs.back() + send_counts.back());
+
+    for (int i = 0; i < size; ++i) {
+      int pos = 0;
+      char* ptr = send_buffer.data() + send_displs[i];
+      int offset = displacements[i];
+      for (int j = 0; j < counts[i]; ++j) {
+        int idx = offset + j;
+        MPI_Pack(&I[idx], 1, MPI_INT, ptr, send_counts[i], &pos, comm);
+        MPI_Pack(&J[idx], 1, MPI_INT, ptr, send_counts[i], &pos, comm);
+        MPI_Pack(&val[idx], 1, MPI_DOUBLE, ptr, send_counts[i], &pos, comm);
+      }
+    }
+  }
+
+  std::vector<char> recv_buffer(counts[rank] * per_entry_size);
+  MPI_Scatterv(send_buffer.data(), send_counts.data(), send_displs.data(), MPI_PACKED,
+               recv_buffer.data(), recv_buffer.size(), MPI_PACKED, 0, comm);
+
+  // Unpack into local COO storage
+  int local_nz = counts[rank];
+  irn.resize(local_nz);
+  jcn.resize(local_nz);
+  a.resize(local_nz);
+
+  int pos = 0;
+  for (int i = 0; i < local_nz; ++i) {
+    MPI_Unpack(recv_buffer.data(), recv_buffer.size(), &pos, &irn[i], 1, MPI_INT, comm);
+    MPI_Unpack(recv_buffer.data(), recv_buffer.size(), &pos, &jcn[i], 1, MPI_INT, comm);
+    MPI_Unpack(recv_buffer.data(), recv_buffer.size(), &pos, &a[i], 1, MPI_DOUBLE, comm);
+  }
 }
 
 
