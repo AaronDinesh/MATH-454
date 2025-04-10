@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=01:30:00
+#SBATCH --qos=serial
+#SBATCH --account=math-454
+#SBATCH --output=/dev/null
+
+compiler=$1
+prog_name=$2
+
+module purge
+module load gcc openmpi openblas
+perf record -o ./data/serial.data --call-graph dwarf ./cgsolver lap2D_5pt_n100.mtx
