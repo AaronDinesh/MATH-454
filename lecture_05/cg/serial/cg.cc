@@ -95,6 +95,9 @@ CGSolverSparse::solve(std::vector<double> &x)
     }
   }
 
+  
+  std::cout << "\t[STEP " << k << "]" << std::endl;
+
   if (DEBUG)
   {
     m_A.mat_vec(x, r);

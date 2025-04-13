@@ -1,6 +1,6 @@
 CXX ?= g++
 LD=${CXX}
-CXXFLAGS+=-Wall -Wextra -Werror -pedantic -std=c++11 -I${OPENBLAS_ROOT}/include -DOMPI_SKIP_MPICXX -O3 -pg
+CXXFLAGS+=-Wall -Wextra -Werror -pedantic -std=c++11 -I${OPENBLAS_ROOT}/include -DOMPI_SKIP_MPICXX -O2 -pg
 LDFLAGS+=-lm $(CXXFLAGS) -L${OPENBLAS_ROOT}/lib -lopenblas
 
 OBJS=cg_main.o cg.o matrix_coo.o mmio.o

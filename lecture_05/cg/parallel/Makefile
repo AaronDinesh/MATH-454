@@ -15,7 +15,7 @@ ifeq ($(findstring mpiicc, $(CXX)), mpiicc)
                -Wl,--end-group -lpthread -lm -ldl
 else
     # Assume OpenBLAS setup
-    CXXFLAGS += -Wall -Wextra -Werror -pedantic -std=c++11 -I${OPENBLAS_ROOT}/include -O3 -g
+    CXXFLAGS += -Wall -Wextra -Werror -pedantic -std=c++11 -I${OPENBLAS_ROOT}/include -O2
     CXXFLAGS += -DOMPI_SKIP_MPICXX
     LDFLAGS += -lm -L${OPENBLAS_ROOT}/lib -lopenblas
 endif

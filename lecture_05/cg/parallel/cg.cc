@@ -1,5 +1,5 @@
 #ifndef DEBUG
-#define DEBUG
+//#define DEBUG
 #endif
 
 #ifndef MKL_LIB
@@ -164,13 +164,12 @@ void CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
     if (rank == 0){
       std::cout << "\t[STEP " << k << "] residual = " << std::scientific << std::sqrt(rsold_global) << "\r" << std::flush;
     }
-    #endif
-
+    #endif 
+  }
+  
     if(rank == 0){
       std::cout << "\t[STEP " << k << "]" <<std::endl;
     }
-  }
-  
   #ifdef DEBUG
     std::vector<double> r_local_debug(m_n);
     std::vector<double> r_global_debug(m_n);
