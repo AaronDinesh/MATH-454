@@ -1,5 +1,5 @@
 #ifndef MKL_LIB
-#define MKL_LIB
+//#define MKL_LIB
 #endif
 
 #include "matrix_coo.hh"

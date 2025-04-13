@@ -1,9 +1,9 @@
 #ifndef DEBUG
-//#define DEBUG
+#define DEBUG
 #endif
 
 #ifndef MKL_LIB
-#define MKL_LIB
+//#define MKL_LIB
 #endif
 
 #include "cg.hh"
@@ -52,8 +52,7 @@ end
 /*
 Sparse version of the cg solver
 */
-void
-CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
+void CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   int size, rank;
 
   //Get the size and rank
@@ -89,14 +88,14 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
   // r = b - A * x;
   m_A.mat_vec(x, mat_vec_partial_product);
   
-  //?Reduce then we take a chunk and start processing stuff locally 
-  //Reduce to compute the full mat vec product and then scatter the result to Ap_local
-  MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
- 
   //Access only my portion of m_b into r_local
   // r_local = m_b[displacements[rank]:displacements[rank] + counts[rank]];
   cblas_dcopy(local_mn_counts[rank], m_b.data() + local_mn_displacements[rank], 1, r_local.data(), 1);
-  
+
+  //?Reduce then we take a chunk and start processing stuff locally 
+  //Reduce to compute the full mat vec product and then scatter the result to Ap_local
+  MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
+     
   //Now use BLAS to do b - A * x
   cblas_daxpy(local_mn_counts[rank], -1., Ap_local.data(), 1, r_local.data(), 1);
 
@@ -120,8 +119,7 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
     // Ap = A * p;
     m_A.mat_vec(p_global, mat_vec_partial_product);
     MPI_Reduce_scatter(mat_vec_partial_product.data(), Ap_local.data(), local_mn_counts.data(), MPI_DOUBLE, MPI_SUM, comm);
-    
-    
+        
     double local_dot_prod_result = cblas_ddot(local_mn_counts[rank], Ap_local.data(), 1, p_local.data(), 1);
     double global_dot_prod_result;
     MPI_Allreduce(&local_dot_prod_result, &global_dot_prod_result, 1, MPI_DOUBLE, MPI_SUM, comm);
@@ -168,6 +166,9 @@ CGSolverSparse::solve(std::vector<double> &x, MPI_Comm comm){
     }
     #endif
 
+    if(rank == 0){
+      std::cout << "\t[STEP " << k << "]" <<std::endl;
+    }
   }
   
   #ifdef DEBUG
