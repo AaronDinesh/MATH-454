@@ -1,5 +1,15 @@
+#ifndef MKL_LIB
+#define MKL_LIB
+#endif
+
 #include "matrix_coo.hh"
-#include <cblas.h>
+
+#ifdef MKL_LIB
+  #include <mkl_cblas.h>
+#else
+  #include <cblas.h>
+#endif
+
 #include <string>
 #include <vector>
 #include <mpi.h>

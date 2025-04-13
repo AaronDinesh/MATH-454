@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=1
+#SBATCH --time=02:30:00
+#SBATCH --qos=math-454
+#SBATCH --account=math-454
+#SBATCH --output=/dev/null
+
+
+module purge
+#module load gcc openmpi openblas
+module load intel intel-oneapi-vtune intel-oneapi-mpi intel-oneapi-mkl
+#srun --output="./timings/parallel/n200/run_2node_32tasks_n200.txt" ./parallel/cgsolver ./matrix/lap2D_5pt_n200.mtx
+
+# Optional: Show MPI time stats per rank
+export I_MPI_STATS=10
+
+# Optional but recommended for affinity control
+export I_MPI_PIN=1
+export I_MPI_PIN_DOMAIN=core
+
+# VTune profiling
+vtune -collect hotspots \
+      -knob sampling-mode=hw \
+      -knob enable-stack-collection=true \
+      -r vtune_results \
+      -- srun --output=./timings/parallel/intel_vtune.txt ./parallel/cgsolver ./matrix/lap2D_5pt_n1000.mtx

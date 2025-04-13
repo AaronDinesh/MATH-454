@@ -26,13 +26,11 @@ int main(int argc, char **argv){
   
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  
-  std::cout << "Hello from rank " << rank << " of " << size << std::endl;
-  
+   
   CGSolverSparse sparse_solver;
   sparse_solver.read_matrix(argv[1]);
   int n = sparse_solver.n();
-  int m = sparse_solver.m();
+  //int m = sparse_solver.m();
   
   
   double h = 1. / n;
@@ -42,11 +40,15 @@ int main(int argc, char **argv){
   std::vector<double> x_s(n);
   std::fill(x_s.begin(), x_s.end(), 0.);
 
-  std::cout << "Call CG sparse on matrix size " << m << " x " << n << ")" << std::endl;
+  //std::cout << "Call CG sparse on matrix size " << m << " x " << n << ")" << std::endl;
   auto t1 = clk::now();
   sparse_solver.solve(x_s, MPI_COMM_WORLD);
   second elapsed = clk::now() - t1;
-  std::cout << "Time for CG (sparse solver) from rank " << rank << " = " << elapsed.count() << " [s]\n";
-  MPI_Finalize();
+  
+  
+  if (rank == 0){
+    std::cout << "Time for CG (sparse solver) from rank " << rank << " = " << elapsed.count() << " [s]\n";
+  }
+    MPI_Finalize();
   return 0;
 }

@@ -1,14 +1,27 @@
+#ifndef DEBUG
+//#define DEBUG
+#endif
+
+#ifndef MKL_LIB
+#define MKL_LIB
+#endif
+
 #include "cg.hh"
 #include <algorithm>
-#include <cblas.h>
+
+#ifdef MKL_LIB
+  #include <mkl_cblas.h>
+#else
+  #include <cblas.h>
+#endif
+
 #include <cmath>
-#include <iostream>
+  #include <iostream>
 #include <mpi.h>
 #include <cassert>
 
 const double NEARZERO = 1.0e-14;
 //const bool DEBUG = true;
-#define DEBUG
 /*
     cgsolver solves the linear equation A*x = b where A is
     of size m x n
