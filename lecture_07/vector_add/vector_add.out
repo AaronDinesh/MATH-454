@@ -1,0 +1,36 @@
+
+Currently Loaded Modules:
+  1) gcc/11.3.0   2) zlib/1.2.12   3) libxml2/2.9.13   4) cuda/11.8.0
+
+ 
+
+[Vector addition of 1048576 elements]
+==3568457== NVPROF is profiling process 3568457, command: ./vector_add
+Test PASSED
+Done
+==3568457== Profiling application: ./vector_add
+==3568457== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   90.72%  55.047ms         1  55.047ms  55.047ms  55.047ms  vectorAddOneThread(float const *, float const *, float*, int)
+                    4.83%  2.9318ms         1  2.9318ms  2.9318ms  2.9318ms  vectorAddOneBlock(float const *, float const *, float*, int)
+                    4.44%  2.6957ms         1  2.6957ms  2.6957ms  2.6957ms  vectorAdd(float const *, float const *, float*, int)
+      API calls:   58.41%  158.05ms         3  52.684ms  10.087us  158.01ms  cudaMallocManaged
+                   22.42%  60.674ms         3  20.225ms  2.6977ms  55.042ms  cudaDeviceSynchronize
+                   18.90%  51.137ms         3  17.046ms  32.828us  51.068ms  cudaLaunchKernel
+                    0.21%  576.06us         3  192.02us  166.54us  235.68us  cudaFree
+                    0.04%  112.89us       101  1.1170us     107ns  47.769us  cuDeviceGetAttribute
+                    0.00%  12.288us         1  12.288us  12.288us  12.288us  cuDeviceGetName
+                    0.00%  10.317us         1  10.317us  10.317us  10.317us  cuDeviceGetPCIBusId
+                    0.00%  9.5310us         1  9.5310us  9.5310us  9.5310us  cuDeviceTotalMem
+                    0.00%  1.0710us         3     357ns     163ns     727ns  cuDeviceGetCount
+                    0.00%     672ns         2     336ns     151ns     521ns  cuDeviceGet
+                    0.00%     300ns         1     300ns     300ns     300ns  cuModuleGetLoadingMode
+                    0.00%     191ns         1     191ns     191ns     191ns  cuDeviceGetUuid
+
+==3568457== Unified Memory profiling result:
+Device "Tesla V100-PCIE-32GB (0)"
+   Count  Avg Size  Min Size  Max Size  Total Size  Total Time  Name
+     390  84.021KB  4.0000KB  0.9961MB  32.00000MB  3.643990ms  Host To Device
+     216  170.67KB  4.0000KB  0.9961MB  36.00000MB  3.099515ms  Device To Host
+      63         -         -         -           -  7.426547ms  Gpu page fault groups
+Total CPU Page faults: 132

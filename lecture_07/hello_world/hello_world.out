@@ -1,0 +1,57 @@
+
+Currently Loaded Modules:
+  1) gcc/11.3.0   2) zlib/1.2.12   3) libxml2/2.9.13   4) cuda/11.8.0
+
+ 
+
+rm -rf *.o hello_world
+nvcc -O3 -c hello_world.cu -o hello_world.o
+nvcc hello_world.o -O3 -o hello
+==276886== NVPROF is profiling process 276886, command: ./hello
+printf() is called. Output:
+Hello world (0 0 0) - (1 0 0)
+Hello world (1 0 0) - (1 0 0)
+Hello world (0 1 0) - (1 0 0)
+Hello world (1 1 0) - (1 0 0)
+Hello world (0 0 1) - (1 0 0)
+Hello world (1 0 1) - (1 0 0)
+Hello world (0 1 1) - (1 0 0)
+Hello world (1 1 1) - (1 0 0)
+Hello world (0 0 0) - (1 1 0)
+Hello world (1 0 0) - (1 1 0)
+Hello world (0 1 0) - (1 1 0)
+Hello world (1 1 0) - (1 1 0)
+Hello world (0 0 1) - (1 1 0)
+Hello world (1 0 1) - (1 1 0)
+Hello world (0 1 1) - (1 1 0)
+Hello world (1 1 1) - (1 1 0)
+Hello world (0 0 0) - (0 1 0)
+Hello world (1 0 0) - (0 1 0)
+Hello world (0 1 0) - (0 1 0)
+Hello world (1 1 0) - (0 1 0)
+Hello world (0 0 1) - (0 1 0)
+Hello world (1 0 1) - (0 1 0)
+Hello world (0 1 1) - (0 1 0)
+Hello world (1 1 1) - (0 1 0)
+Hello world (0 0 0) - (0 0 0)
+Hello world (1 0 0) - (0 0 0)
+Hello world (0 1 0) - (0 0 0)
+Hello world (1 1 0) - (0 0 0)
+Hello world (0 0 1) - (0 0 0)
+Hello world (1 0 1) - (0 0 0)
+Hello world (0 1 1) - (0 0 0)
+Hello world (1 1 1) - (0 0 0)
+==276886== Profiling application: ./hello
+==276886== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:  100.00%  63.104us         1  63.104us  63.104us  63.104us  hello_world(void)
+      API calls:   99.75%  166.55ms         1  166.55ms  166.55ms  166.55ms  cudaLaunchKernel
+                    0.16%  270.16us         1  270.16us  270.16us  270.16us  cudaDeviceSynchronize
+                    0.08%  129.53us       101  1.2820us     115ns  54.243us  cuDeviceGetAttribute
+                    0.01%  8.8590us         1  8.8590us  8.8590us  8.8590us  cuDeviceGetPCIBusId
+                    0.00%  7.8920us         1  7.8920us  7.8920us  7.8920us  cuDeviceGetName
+                    0.00%  1.2420us         3     414ns     164ns     877ns  cuDeviceGetCount
+                    0.00%     541ns         1     541ns     541ns     541ns  cuDeviceTotalMem
+                    0.00%     539ns         2     269ns     156ns     383ns  cuDeviceGet
+                    0.00%     339ns         1     339ns     339ns     339ns  cuDeviceGetUuid
+                    0.00%     296ns         1     296ns     296ns     296ns  cuModuleGetLoadingMode
