@@ -3,7 +3,9 @@
 #include <iostream>
 
 __global__ void hello_world() {
-  // TODO: experiment with printf here and the thread and grid idx
+  printf("Hello world (%d %d %d) - (%d %d %d)\n",
+         threadIdx.x, threadIdx.y, threadIdx.z,
+         blockIdx.x, blockIdx.y, blockIdx.z);
 }
 
 int main() {
@@ -15,7 +17,8 @@ int main() {
   dim3 dimBlock(2, 2, 2);
 
   hello_world<<<dimGrid, dimBlock>>>();
-  // TODO: what do you need to do in order to ensure printing?
+  //Wait here for everything to be printed out.
+  cudaDeviceSynchronize();
 
   return 0;
 }
