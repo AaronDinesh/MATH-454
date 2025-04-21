@@ -1,6 +1,6 @@
 #include "matrix_coo.hh"
 extern "C" {
-#include "mmio.h"
+  #include "mmio.h"
 }
 
 void MatrixCOO::read(const std::string & fn) {
