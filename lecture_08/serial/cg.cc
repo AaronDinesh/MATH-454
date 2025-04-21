@@ -1,12 +1,11 @@
+#include "config.hh"
 #include "cg.hh"
-
 #include <algorithm>
 #include <cblas.h>
 #include <cmath>
 #include <iostream>
 
 const double NEARZERO = 1.0e-14;
-const bool DEBUG = true;
 
 /*
     cgsolver solves the linear equation A*x = b where A is
@@ -88,13 +87,13 @@ void CGSolver::solve(std::vector<double> & x) {
 
     // rsold = rsnew;
     rsold = rsnew;
-    if (DEBUG) {
+    #ifdef DEBUG
       std::cout << "\t[STEP " << k << "] residual = " << std::scientific
                 << std::sqrt(rsold) << "\r" << std::flush;
-    }
+    #endif
   }
 
-  if (DEBUG) {
+  #ifdef DEBUG
     std::fill_n(r.begin(), r.size(), 0.);
     cblas_dgemv(CblasRowMajor, CblasNoTrans, m_m, m_n, 1., m_A.data(), m_n,
                 x.data(), 1, 0., r.data(), 1);
@@ -105,7 +104,7 @@ void CGSolver::solve(std::vector<double> & x) {
     std::cout << "\t[STEP " << k << "] residual = " << std::scientific
               << std::sqrt(rsold) << ", ||x|| = " << nx
               << ", ||Ax - b||/||b|| = " << res << std::endl;
-  }
+  #endif
 }
 
 void CGSolver::read_matrix(const std::string & filename) {
