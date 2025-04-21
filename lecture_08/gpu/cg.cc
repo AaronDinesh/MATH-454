@@ -40,19 +40,6 @@ void CGSolver::solve(std::vector<double> & x) {
   std::vector<double> Ap(m_n);
   std::vector<double> tmp(m_n);
   
-  //First thing to do when we call solve is to copy the matrix from the Host to Device
-  double* d_A = NULL;
-  cudaError_t err = m_A.copy_to_device(d_A);
-
-  if (err != cudaSuccess) {
-    std::cerr << "Error copying matrix to device: " << cudaGetErrorString(err) << std::endl;
-    if(d_A){
-      //Free if we actually allocated but failed to copy
-      cudaFree(d_A);
-    } 
-    return;
-  }
-  
 
   // r = b - A * x;
   std::fill_n(Ap.begin(), Ap.size(), 0.);
