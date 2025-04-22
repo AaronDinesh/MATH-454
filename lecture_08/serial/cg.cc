@@ -87,13 +87,13 @@ void CGSolver::solve(std::vector<double> & x) {
 
     // rsold = rsnew;
     rsold = rsnew;
-    #ifdef DEBUG
+    #if DEBUG
       std::cout << "\t[STEP " << k << "] residual = " << std::scientific
                 << std::sqrt(rsold) << "\r" << std::flush;
     #endif
   }
 
-  #ifdef DEBUG
+  #if DEBUG
     std::fill_n(r.begin(), r.size(), 0.);
     cblas_dgemv(CblasRowMajor, CblasNoTrans, m_m, m_n, 1., m_A.data(), m_n,
                 x.data(), 1, 0., r.data(), 1);

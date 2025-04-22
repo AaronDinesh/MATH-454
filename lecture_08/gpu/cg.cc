@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <cuda_runtime.h>
+#include "cuda_ops.hh"
 
 const double NEARZERO = 1.0e-14;
 
@@ -34,6 +35,7 @@ function x = conjgrad(A, b, x)
 end
 
 */
+/*
 void CGSolver::solve(std::vector<double> & x) {
   std::vector<double> r(m_n);
   std::vector<double> p(m_n);
@@ -108,6 +110,150 @@ void CGSolver::solve(std::vector<double> & x) {
               << ", ||Ax - b||/||b|| = " << res << std::endl;
   #endif
 }
+*/
+
+void CGSolver::solve(std::vector<double> & x) {
+  double* d_x = nullptr;
+  copy_to_device<double>(d_x, x.data(), m_n);
+  
+  double* d_r = nullptr;
+  zero_malloc_on_device<double>(d_r, m_n);
+
+  double* d_p = nullptr;
+  zero_malloc_on_device<double>(d_p, m_n);
+
+  double* d_Ap = nullptr;
+  zero_malloc_on_device<double>(d_Ap, m_n);
+
+  double* d_b = nullptr;
+  copy_to_device<double>(d_b, m_b.data(), m_n);
+
+  double* d_A = nullptr;
+  copy_to_device<double>(d_A, m_A.data(), m_m * m_n);
+
+  double* d_tmp = nullptr;
+  zero_malloc_on_device<double>(d_tmp, m_n);
+
+  double* d_rsold = nullptr;
+  zero_malloc_on_device<double>(d_rsold, 1);
+
+  double* ddot_result = nullptr;
+  zero_malloc_on_device<double>(ddot_result, 1);
+
+  double* d_alpha = nullptr;
+  zero_malloc_on_device<double>(d_alpha, 1);
+  
+  double* h_rsnew = nullptr; //used in the for loop below
+  
+  double* d_beta = nullptr;
+  zero_malloc_on_device<double>(d_beta, 1);
+
+  #if DEBUG
+    double* h_rsold = nullptr;
+  #endif
+
+  int grid_size_m = (m_m + THREADS_PER_BLOCK  - 1) / THREADS_PER_BLOCK;
+  // r = b - A * x;
+  cu_dgemv<double><<<grid_size_m, THREADS_PER_BLOCK>>>(d_Ap, d_A, d_x, 1., 0., m_m, m_n);
+
+  assign_on_device<double>(d_b, d_r, m_n);
+
+  int grid_size_n = (m_n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;  // Round up
+  cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(-1., d_Ap, d_r, m_n);
+
+  assign_on_device<double>(d_r, d_p, m_n);
+  
+
+  cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_rsold, d_r, d_r, m_n);
+
+  int k = 0;
+  for(; k < m_n; k++) {
+    // Ap = A * p;
+    cu_dgemv<double><<<grid_size_m, THREADS_PER_BLOCK>>>(d_Ap, d_A, d_p, 1., 0., m_m, m_n);
+    
+    // alpha = rsold / max((p' * Ap), rsold*NEARZERO); (next two lines)
+    cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(ddot_result, d_p, d_Ap, m_n);
+
+    compute_alpha<double><<<1, 1>>>(d_alpha, d_rsold, ddot_result);
+
+    // x = x + alpha * p;
+    cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_alpha, d_p, d_x, m_n);
+
+    // r = r - alpha * Ap; (next two lines)
+    cu_negate<double><<<1,1>>>(d_alpha, 1);
+    
+    cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_alpha, d_Ap, d_r, m_n);
+
+    assign_on_device<double>(0., ddot_result);
+    cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(ddot_result, d_r, d_r, m_n);
+
+
+    copy_from_device<double>(h_rsnew, ddot_result, 1);
+
+    if(!h_rsnew){
+      std::cout << "An error occured copying from device" << std::endl;
+      return;
+    }
+
+    //At this point h_rsnew is safe to use
+    if(*h_rsnew < m_tolerance){
+      break;
+    }
+
+    //beta = rsnew / rsold;
+    compute_beta<double><<<1,1>>>(d_beta, d_rsold, ddot_result); //ddot_result is rsnew 
+
+    //p = r + beta * p;
+    assign_on_device(d_r, d_tmp, m_n);
+    cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_beta, d_p, d_tmp, m_n);
+    assign_on_device(d_tmp, d_p, m_n);
+
+    //rsold = rsnew;
+    assign_on_device(ddot_result, d_rsold, 1);
+
+    #if DEBUG
+      copy_from_device<double>(h_rsold, d_rsold, 1);
+      std::cout << "\t[STEP " << k << "] residual = " << std::scientific
+                << std::sqrt(*h_rsold) << std::endl;
+    #endif
+  }
+
+  #if DEBUG
+    double* d_r = nullptr;
+    zero_malloc_on_device<double>(d_r, m_n);
+    
+    cu_dgemv<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_r, d_A, d_x, 1., 0., m_m, m_n);
+
+    cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(-1., d_b, d_r, m_n);
+
+    assign_on_device<double>(0., ddot_result);
+    cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(ddot_result, d_r, d_r, m_n);
+
+    double* h_rsqaured = nullptr;
+    copy_from_device<double>(h_rsqaured, ddot_result, 1);
+
+    assign_on_device(0., ddot_result);
+    cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(ddot_result, d_b, d_b, m_n);
+    
+    double* h_bsquared = nullptr;
+    copy_from_device<double>(h_bsquared, ddot_result, 1);
+    double res = std::sqrt(*h_rsqaured) / std::sqrt(*h_bsquared);
+    
+    assign_on_device(0., ddot_result);
+    cu_ddot<double><<<grid_size_n, THREADS_PER_BLOCK>>>(ddot_result, d_x, d_x, m_n);
+
+    double* h_xsquared = nullptr;
+    copy_from_device<double>(h_xsquared, ddot_result, 1);
+    double nx = std::sqrt(*h_xsquared);
+
+    std::cout << "\t[STEP " << k << "] residual = " << std::scientific
+              << std::sqrt(*h_rsold) << ", ||x|| = " << nx
+              << ", ||Ax - b||/||b|| = " << res << std::endl;
+  #endif
+}
+
+
+
 
 void CGSolver::read_matrix(const std::string & filename) {
   m_A.read(filename);

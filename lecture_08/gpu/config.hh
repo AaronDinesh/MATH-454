@@ -1,6 +1,15 @@
-#ifndef __CONFIG_HH__
-#define __CONFIG_HH__
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
 
-#define DEBUG
+#define THREADS_PER_BLOCK 256
+
+//Comment this line if you want to turn off debug mode
+#define DEBUG 1
+
+//Comment this line if you want to turn off max threaded mode and do thread scaling experiments
+#define MAX_THREADED_MODE 1
+
+#define ERROR_CHECKING 1
+
 
 #endif

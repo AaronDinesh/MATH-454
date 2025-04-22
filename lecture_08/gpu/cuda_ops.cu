@@ -1,76 +1,108 @@
-#include "config.h"
+#include "config.hh"
 #include <cuda_runtime.h>
 #include "cuda_ops.hh"
 #include <iostream>
 
-__global__ void vector_add(float* c, const float* a, const float* b, int n) {
-  #ifdef MAX_THREADED_MODE
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+#define NEARZERO 1.0e-14
+
+template <typename T>
+__global__ void vector_add(T* c, const T* a, const T* b, size_t n) {
+  #if MAX_THREADED_MODE
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
       c[idx] = a[idx] + b[idx];
     }
   #else
-    int total_threads = blockDim.x * gridDim.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int i = idx; i < n; i += total_threads) {
+    for (size_t i = idx; i < n; i += total_threads) {
       c[i] = a[i] + b[i];
     }
   #endif
-
-
 }
 
-__global__ void cu_daxpy(float* c, const float a, const float* x, const float* y, int n) {
-  #ifdef MAX_THREADED_MODE
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+template <typename T>
+__global__ void cu_daxpy(const T alpha, const T* x, T* y, size_t n) {
+  #if MAX_THREADED_MODE
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
-      c[idx] = a * x[idx] + y[idx];
+      y[idx] = alpha * x[idx] + y[idx];
     }
   #else
-    int total_threads = blockDim.x * gridDim.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    for (int i = idx; i < n; i += total_threads) {
-      c[i] = a * x[i] + y[i];
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    #pragma unroll 4
+    for (size_t i = idx; i < n; i += total_threads) {
+      y[i] = alpha * x[i] + y[i];
     }
   #endif
 }
 
-__global__ void cu_ddot(float* c, const float* x, const float* y, int n){
-  #ifdef MAX_THREADED_MODE
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+template <typename T>
+__global__ void cu_daxpy(const T* alpha, const T* x, T* y, size_t n) {
+  T alpha_val = *alpha;
+  #if MAX_THREADED_MODE
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
-      c[idx] = x[idx] * y[idx];
+      y[idx] = alpha_val * x[idx] + y[idx];
     }
   #else
-    int total_threads = blockDim.x * gridDim.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    for (int i = idx; i < n; i += total_threads) {
-      c[i] = x[i] * y[i];
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    #pragma unroll 4
+    for (size_t i = idx; i < n; i += total_threads) {
+      y[i] = alpha_val * x[i] + y[i];
     }
   #endif
 }
 
-__global__ void cu_dgemv(float* c, const float* A, const float* x, const float alpha, const float beta, int m, int n){
-  #ifdef MAX_THREADED_MODE
-    int matrix_row = blockIdx.x * blockDim.x + threadIdx.x;
+
+template <typename T>
+__global__ void cu_ddot(T* c, const T* x, const T* y, size_t n){
+  #if MAX_THREADED_MODE
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+      T partial_product = x[idx] * y[idx];
+      atomicAdd(c, partial_product);
+    }
+  #else
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    #pragma unroll 4
+    for (size_t i = idx; i < n; i += total_threads) {
+      T partial_product = x[i] * y[i];
+      atomicAdd(c, partial_product);
+    }
+  #endif
+}
+
+template <typename T>
+__global__ void cu_dgemv(T* c, const  T* A, const T* x, const T alpha, const T beta, size_t m, size_t n){
+  #if MAX_THREADED_MODE
+    size_t matrix_row = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (matrix_row < m) {
-      double sum = 0;
-      for (int i = 0; i < n; i++) {
+      T sum = 0;
+
+      #pragma unroll 4
+      for (size_t i = 0; i < n; i++) {
         sum += A[matrix_row * n + i] * x[i];
       }
       c[matrix_row] = alpha * sum + beta * c[matrix_row];
     }
   #else
-    int total_threads = blockDim.x * gridDim.x;
-    int matrix_row = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t matrix_row = blockIdx.x * blockDim.x + threadIdx.x;
 
-    for (int row = matrix_row; row < m; row += total_threads) {
-      float sum = 0.0f;
-      for (int i = 0; i < n; ++i) {
+    for (size_t row = matrix_row; row < m; row += total_threads) {
+      T sum = 0.0f;
+
+      #pragma unroll 4
+      for (size_t i = 0; i < n; ++i) {
         sum += A[row * n + i] * x[i];
       }
       c[row] = alpha * sum + beta * c[row];
@@ -78,30 +110,34 @@ __global__ void cu_dgemv(float* c, const float* A, const float* x, const float a
   #endif
 }
 
-__global__ void cu_dgemm(float* C, const float* A, const float* B, const float alpha, const float beta, int m, int n, int k){
-  #ifdef MAX_THREADED_MODE
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+template <typename T>
+__global__ void cu_dgemm(T* C, const T* A, const T* B, const T alpha, const T beta, size_t m, size_t n, size_t k){
+  #if MAX_THREADED_MODE
+    size_t row = blockIdx.y * blockDim.y + threadIdx.y;
+    size_t col = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (row < m && col < n) {
-      float sum = 0.0f;
-      for (int i = 0; i < k; ++i) {
+      T sum = 0.0f;
+      
+      #pragma unroll 4
+      for (size_t i = 0; i < k; ++i) {
         sum += A[row * k + i] * B[i * n + col];
       }
       C[row * n + col] = alpha * sum + beta * C[row * n + col];
     }
   #else
-    int total_threads = blockDim.x * gridDim.x;
-    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t thread_id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    int total_elements = m * n;
+    size_t total_elements = m * n;
 
-    for (int idx = thread_id; idx < total_elements; idx += total_threads) {
-      int row = idx / n;
-      int col = idx % n;
+    for (size_t idx = thread_id; idx < total_elements; idx += total_threads) {
+      size_t row = idx / n;
+      size_t col = idx % n;
 
-      float sum = 0.0f;
-      for (int i = 0; i < k; ++i) {
+      T sum = 0.0f;
+      #pragma unroll 4
+      for (size_t i = 0; i < k; ++i) {
         sum += A[row * k + i] * B[i * n + col];
       }
       C[row * n + col] = alpha * sum + beta * C[row * n + col];
@@ -109,13 +145,138 @@ __global__ void cu_dgemm(float* C, const float* A, const float* B, const float a
   #endif
 }
 
+
+template <typename T>
+__global__ void cu_negate(T* a, size_t n){
+  if(n == 1){
+    if(threadIdx.x == 0 && blockIdx.x == 0){
+      *a = -(*a);
+    }
+    return;
+    }
+  #if MAX_THREADED_MODE
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n) {
+      a[idx] = -a[idx];
+    }
+  #else
+    size_t total_threads = blockDim.x * gridDim.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+      
+    #pragma unroll 4
+    for (size_t i = idx; i < n; i += total_threads) {
+      a[i] = -a[i];
+    }
+  #endif
+}
+
 template <typename T>
 __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
   size_t size = count * sizeof(T);
-  cudaError_t cudaStatus = cudaMemcpy(h_a, d_a, size, cudaMemcpyDeviceToHost); 
-  if (cudaStatus != cudaSuccess) {
-    free(h_a);
-    h_a = nullptr;
-    std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+
+  if (!h_a) {
+    h_a = (T*) malloc(size);
   }
+
+  #if ERROR_CHECKING
+    if (!h_a) {
+        std::cout << "Host malloc failed\n";
+        return;
+    }
+  #endif
+
+  cudaError_t cudaStatus = cudaMemcpy(static_cast<void *>(h_a), static_cast<const void*>(d_a), size, cudaMemcpyDeviceToHost); 
+  
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      free(h_a);
+      h_a = nullptr;
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+}
+
+template <typename T>
+__host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
+  size_t size = count * sizeof(T);
+
+  cudaError_t cudaStatus = cudaMalloc(static_cast<void**>(&d_a), size);
+  
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+
+  cudaStatus = cudaMemcpy(static_cast<void*>(d_a), static_cast<const void*>(h_a), size, cudaMemcpyHostToDevice);
+  
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      cudaFree(d_a);
+      d_a = nullptr;
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+}
+
+template <typename T>
+__host__ void zero_malloc_on_device(T* &d_a, size_t count){
+  size_t size = count * sizeof(T);
+
+  cudaError_t cudaStatus = cudaMalloc(static_cast<void**>(&d_a), size);
+
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess){
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+
+  cudaStatus = cudaMemset(static_cast<void*>(d_a), 0, size);
+
+  #if ERROR_CHECKING
+    if(cudaStatus != cudaSuccess){
+      cudaFree(d_a);
+      d_a = nullptr;
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl; 
+    }
+  #endif
+}
+
+
+template <typename T>
+__host__ void assign_on_device(const T* src, T* dst, size_t count){
+  size_t size = count * sizeof(T);
+
+  cudaError_t cudaStatus = cudaMemcpy(static_cast<void*>(dst), static_cast<const void*>(src), size, cudaMemcpyDeviceToDevice);
+  
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+}
+
+template <typename T>
+__host__ void assign_on_device(const T a, T* dst){
+  cudaError_t cudaStatus = cudaMemcpy(static_cast<void*>(dst), static_cast<const void*>(&a), sizeof(T), cudaMemcpyHostToDevice);
+  
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+}
+
+template <typename T>
+__global__ void compute_alpha(T* alpha, const T* rsold, const T* d_pAp){
+  if(threadIdx.x == 0 && blockIdx.x == 0){
+    *alpha = *rsold / fmax(*d_pAp, *rsold * static_cast<T>(NEARZERO));
+  }
+}
+
+template <typename T>
+__global__ void compute_beta(T* beta, const T* rsold, const T* rsnew){
+  if(threadIdx.x == 0 && blockIdx.x == 0){
+    *beta = *rsnew / *rsold;
+  } 
 }
