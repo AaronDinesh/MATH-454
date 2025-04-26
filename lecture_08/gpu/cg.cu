@@ -1,13 +1,10 @@
 #include "config.hh"
 #include "cg.hh"
 #include <algorithm>
-#include <cblas.h>
 #include <cmath>
 #include <iostream>
 #include <cuda_runtime.h>
 #include "cuda_ops.hh"
-
-const double NEARZERO = 1.0e-14;
 
 /*
     cgsolver solves the linear equation A*x = b where A is
@@ -219,8 +216,7 @@ void CGSolver::solve(std::vector<double> & x) {
   }
 
   #if DEBUG
-    double* d_r = nullptr;
-    zero_malloc_on_device<double>(d_r, m_n);
+    assign_on_device<double>(0., d_r, m_n);
     
     cu_dgemv<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_r, d_A, d_x, 1., 0., m_m, m_n);
 
@@ -249,7 +245,24 @@ void CGSolver::solve(std::vector<double> & x) {
     std::cout << "\t[STEP " << k << "] residual = " << std::scientific
               << std::sqrt(*h_rsold) << ", ||x|| = " << nx
               << ", ||Ax - b||/||b|| = " << res << std::endl;
+    
+    free_on_device<double>(h_rsqaured);
+    free_on_device<double>(h_bsquared);
+    free_on_device<double>(h_xsquared);
+    free_on_device<double>(h_rsold);
   #endif
+
+  free_on_device<double>(d_x);
+  free_on_device<double>(d_r);
+  free_on_device<double>(d_p);
+  free_on_device<double>(d_Ap);
+  free_on_device<double>(d_b);
+  free_on_device<double>(d_A);
+  free_on_device<double>(d_tmp);
+  free_on_device<double>(d_rsold);
+  free_on_device<double>(ddot_result);
+  free_on_device<double>(d_alpha);
+  free_on_device<double>(d_beta);
 }
 
 

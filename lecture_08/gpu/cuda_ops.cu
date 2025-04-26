@@ -3,8 +3,6 @@
 #include "cuda_ops.hh"
 #include <iostream>
 
-#define NEARZERO 1.0e-14
-
 template <typename T>
 __global__ void vector_add(T* c, const T* a, const T* b, size_t n) {
   #if MAX_THREADED_MODE
@@ -268,9 +266,22 @@ __host__ void assign_on_device(const T a, T* dst){
 }
 
 template <typename T>
+__host__ void free_on_device(T* &d_a){
+  if(d_a){
+    cudaError_t cudaStatus = cudaFree(static_cast<void*>(d_a));
+    d_a = nullptr;
+    #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+    #endif
+  }
+}
+
+template <typename T>
 __global__ void compute_alpha(T* alpha, const T* rsold, const T* d_pAp){
   if(threadIdx.x == 0 && blockIdx.x == 0){
-    *alpha = *rsold / fmax(*d_pAp, *rsold * static_cast<T>(NEARZERO));
+    *alpha = *rsold / fmax(*d_pAp, *rsold * static_cast<T>(1.0e-14));
   }
 }
 

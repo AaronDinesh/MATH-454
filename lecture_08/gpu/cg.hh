@@ -1,5 +1,4 @@
 #include "matrix.hh"
-#include <cblas.h>
 #include <string>
 #include <vector>
 

@@ -1,14 +1,43 @@
-CXX=g++
-LD=${CXX}
-CXXFLAGS+=-Wall -Wextra -Werror -pedantic -std=c++11  -gpu-architecture=compute_70 --gpu-code=sm_70 --use_fast_math -O3
-LDFLAGS+=-lm $(CXXFLAGS)
+# Tools
+NVCC        := nvcc
+CXX         := g++
+CC          := gcc
 
-OBJS=cg_main.o cg.o matrix.o matrix_coo.o mmio.o
+# Compiler flags
+CXXFLAGS := -std=c++11 -O3 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -pedantic 
+CCFLAGS :=-O3 
+NVCCFLAGS :=-std=c++11 -O3 --Werror cross-execution-space-call,deprecated-declarations, \
+			--gpu-architecture=compute_70 --gpu-code=sm_70 --use_fast_math
 
-all: cgsolver
+# Linker flags
+LDFLAGS     := -lcudart
 
-cgsolver: $(OBJS)
-	$(LD) -o $@ $(OBJS) $(LDFLAGS)
+# Include and source paths
+INCLUDES    := -I. 
+SRCS_CPP    := matrix_coo.cc matrix.cc cg.cc cg_main.cc mmio.cc
+SRCS_CU     := cuda_ops.cu
+OBJS_CPP    := $(SRCS_CPP:.cc=.o)
+OBJS_CU     := $(SRCS_CU:.cu=.o)
+
+TARGET      := cg_solver
+
+.PHONY: all clean
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS_CPP) $(OBJS_CU)
+	$(NVCC) $(NVCCFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS)
+
+%.o: %.cc
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+
+%.o: %.cu
+	$(NVCC) $(NVCCFLAGS) $(INCLUDES) -c $< -o $@
+
+%.o: %.c
+	$(CC) $(CCFLAGS) $(INCLUDES) -c $< -o $@
+
 
 clean:
-	rm -f cgsolver *.o *~
+	rm -f $(OBJS_CPP) $(OBJS_CU) $(TARGET)
+

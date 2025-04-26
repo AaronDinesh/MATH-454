@@ -196,4 +196,13 @@ template <typename T>
  */
 __global__ void compute_beta(T* beta, const T* rsold, const T* rsnew);
 
+template <typename T>
+/**
+ * @brief Frees a block of allocated memory on the CUDA device
+ * 
+ * @tparam T datatype
+ * @param d_a pointer to the device array
+ */
+__host__ void free_on_device(T* &d_a);
+
 #endif
