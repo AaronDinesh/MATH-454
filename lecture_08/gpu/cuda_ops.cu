@@ -169,7 +169,7 @@ __global__ void cu_negate(T* a, size_t n){
 }
 
 template <typename T>
-__host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
+void copy_from_device(T* &h_a, const T* d_a, size_t count){
   size_t size = count * sizeof(T);
 
   if (!h_a) {
@@ -195,10 +195,10 @@ __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
 }
 
 template <typename T>
-__host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
+void copy_to_device(T* &d_a, const T* h_a, size_t count){
   size_t size = count * sizeof(T);
 
-  cudaError_t cudaStatus = cudaMalloc(static_cast<void**>(&d_a), size);
+  cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
@@ -206,11 +206,11 @@ __host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
     }
   #endif
 
-  cudaStatus = cudaMemcpy(static_cast<void*>(d_a), static_cast<const void*>(h_a), size, cudaMemcpyHostToDevice);
+  cudaStatus = cudaMemcpy((void*) d_a, (const void*) h_a, size, cudaMemcpyHostToDevice);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
-      cudaFree(d_a);
+      cudaFree((void*) d_a);
       d_a = nullptr;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
@@ -218,10 +218,10 @@ __host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
 }
 
 template <typename T>
-__host__ void zero_malloc_on_device(T* &d_a, size_t count){
+void zero_malloc_on_device(T* &d_a, size_t count){
   size_t size = count * sizeof(T);
 
-  cudaError_t cudaStatus = cudaMalloc(static_cast<void**>(&d_a), size);
+  cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
 
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess){
@@ -229,11 +229,11 @@ __host__ void zero_malloc_on_device(T* &d_a, size_t count){
     }
   #endif
 
-  cudaStatus = cudaMemset(static_cast<void*>(d_a), 0, size);
+  cudaStatus = cudaMemset((void*) d_a, 0, size);
 
   #if ERROR_CHECKING
     if(cudaStatus != cudaSuccess){
-      cudaFree(d_a);
+      cudaFree((void*) d_a);
       d_a = nullptr;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl; 
     }
@@ -242,10 +242,10 @@ __host__ void zero_malloc_on_device(T* &d_a, size_t count){
 
 
 template <typename T>
-__host__ void assign_on_device(const T* src, T* dst, size_t count){
+void assign_on_device(const T* src, T* dst, size_t count){
   size_t size = count * sizeof(T);
 
-  cudaError_t cudaStatus = cudaMemcpy(static_cast<void*>(dst), static_cast<const void*>(src), size, cudaMemcpyDeviceToDevice);
+  cudaError_t cudaStatus = cudaMemcpy((void*) dst, (const void*) src, size, cudaMemcpyDeviceToDevice);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
@@ -255,8 +255,8 @@ __host__ void assign_on_device(const T* src, T* dst, size_t count){
 }
 
 template <typename T>
-__host__ void assign_on_device(const T a, T* dst){
-  cudaError_t cudaStatus = cudaMemcpy(static_cast<void*>(dst), static_cast<const void*>(&a), sizeof(T), cudaMemcpyHostToDevice);
+void assign_on_device(const T a, T* dst){
+  cudaError_t cudaStatus = cudaMemcpy((void*) dst, (const void*) &a, sizeof(T), cudaMemcpyHostToDevice);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
@@ -266,7 +266,7 @@ __host__ void assign_on_device(const T a, T* dst){
 }
 
 template <typename T>
-__host__ void free_on_device(T* &d_a){
+void free_on_device(T* &d_a){
   if(d_a){
     cudaError_t cudaStatus = cudaFree(static_cast<void*>(d_a));
     d_a = nullptr;
@@ -291,3 +291,20 @@ __global__ void compute_beta(T* beta, const T* rsold, const T* rsnew){
     *beta = *rsnew / *rsold;
   } 
 }
+
+// For device functions
+template void copy_to_device<double>(double*&, const double*, size_t);
+template void copy_from_device<double>(double*&, const double*, size_t);
+template void zero_malloc_on_device<double>(double*&, size_t);
+template void assign_on_device<double>(const double*, double*, size_t);
+template void assign_on_device<double>(double, double*, size_t);
+template void assign_on_device<double>(double, double*);
+template void free_on_device<double>(double*&);
+
+// For CUDA kernels (__global__)
+template __global__ void cu_daxpy<double>(const double*, const double*, double*, size_t);
+template __global__ void cu_ddot<double>(double*, const double*, const double*, size_t);
+template __global__ void cu_negate<double>(double*, size_t);
+template __global__ void cu_dgemv<double>(double*, const double*, const double*, double, double, size_t, size_t);
+template __global__ void compute_beta<double>(double*, const double*, const double*);
+template __global__ void compute_alpha<double>(double*, const double*, const double*);
