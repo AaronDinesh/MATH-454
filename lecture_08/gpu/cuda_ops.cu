@@ -86,7 +86,7 @@ __global__ void cu_dgemv(T* c, const  T* A, const T* x, const T alpha, const T b
     if (matrix_row < m) {
       T sum = 0;
 
-      #pragma unroll 4
+      #pragma unroll 8
       for (size_t i = 0; i < n; i++) {
         sum += A[matrix_row * n + i] * x[i];
       }
@@ -169,7 +169,7 @@ __global__ void cu_negate(T* a, size_t n){
 }
 
 template <typename T>
-void copy_from_device(T* &h_a, const T* d_a, size_t count){
+__host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
   size_t size = count * sizeof(T);
 
   if (!h_a) {
@@ -189,19 +189,21 @@ void copy_from_device(T* &h_a, const T* d_a, size_t count){
     if (cudaStatus != cudaSuccess) {
       free(h_a);
       h_a = nullptr;
+      std::cout << "copy_from_device failed because cudaMemcpy failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
 }
 
 template <typename T>
-void copy_to_device(T* &d_a, const T* h_a, size_t count){
+__host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
   size_t size = count * sizeof(T);
 
   cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
+      std::cout << "copy_to_device failed because cudaMalloc failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
@@ -212,19 +214,21 @@ void copy_to_device(T* &d_a, const T* h_a, size_t count){
     if (cudaStatus != cudaSuccess) {
       cudaFree((void*) d_a);
       d_a = nullptr;
+      std::cout << "copy_to_device failed because cudaMemcpy failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
 }
 
 template <typename T>
-void zero_malloc_on_device(T* &d_a, size_t count){
+__host__ void zero_malloc_on_device(T* &d_a, size_t count){
   size_t size = count * sizeof(T);
 
   cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
 
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess){
+      std::cout << "zero_malloc_on_device failed because cudaMalloc failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
@@ -235,6 +239,7 @@ void zero_malloc_on_device(T* &d_a, size_t count){
     if(cudaStatus != cudaSuccess){
       cudaFree((void*) d_a);
       d_a = nullptr;
+      std::cout << "zero_malloc_on_device failed because cudaMemset failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl; 
     }
   #endif
@@ -242,36 +247,53 @@ void zero_malloc_on_device(T* &d_a, size_t count){
 
 
 template <typename T>
-void assign_on_device(const T* src, T* dst, size_t count){
+__host__ void assign_on_device(const T* src, T* dst, size_t count){
   size_t size = count * sizeof(T);
 
   cudaError_t cudaStatus = cudaMemcpy((void*) dst, (const void*) src, size, cudaMemcpyDeviceToDevice);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
+      std::cout << "assign_on_device failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
 }
 
 template <typename T>
-void assign_on_device(const T a, T* dst){
+__host__ void assign_on_device(const T a, T* dst){
   cudaError_t cudaStatus = cudaMemcpy((void*) dst, (const void*) &a, sizeof(T), cudaMemcpyHostToDevice);
   
   #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
+      std::cout << "assign_on_device failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
 }
 
 template <typename T>
-void free_on_device(T* &d_a){
+__host__  void zero_fill_array(T* dst, size_t count){
+  size_t size = count * sizeof(T);
+
+  cudaError_t cudaStatus = cudaMemset((void*) dst, (T) 0, size);
+
+  #if ERROR_CHECKING
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "zero_fill_array failed! Cuda error below." << std::endl;
+      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+  #endif
+}
+
+template <typename T>
+__host__ void free_on_device(T* &d_a){
   if(d_a){
-    cudaError_t cudaStatus = cudaFree(static_cast<void*>(d_a));
+    cudaError_t cudaStatus = cudaFree((void*) d_a);
     d_a = nullptr;
     #if ERROR_CHECKING
     if (cudaStatus != cudaSuccess) {
+      std::cout << "free_on_device failed! Cuda error below." << std::endl;
       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
     }
     #endif
@@ -297,12 +319,13 @@ template void copy_to_device<double>(double*&, const double*, size_t);
 template void copy_from_device<double>(double*&, const double*, size_t);
 template void zero_malloc_on_device<double>(double*&, size_t);
 template void assign_on_device<double>(const double*, double*, size_t);
-template void assign_on_device<double>(double, double*, size_t);
-template void assign_on_device<double>(double, double*);
+template void assign_on_device<double>(const double, double*);
 template void free_on_device<double>(double*&);
+template void zero_fill_array<double>(double*, size_t);
 
 // For CUDA kernels (__global__)
 template __global__ void cu_daxpy<double>(const double*, const double*, double*, size_t);
+template __global__ void cu_daxpy<double>(const double, const double*, double*, size_t);
 template __global__ void cu_ddot<double>(double*, const double*, const double*, size_t);
 template __global__ void cu_negate<double>(double*, size_t);
 template __global__ void cu_dgemv<double>(double*, const double*, const double*, double, double, size_t, size_t);

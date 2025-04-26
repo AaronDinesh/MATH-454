@@ -1,0 +1,30 @@
+Call CG dense on matrix size 10000 x 10000)
+==1709011== NVPROF is profiling process 1709011, command: ./cg_solver lap2D_5pt_n100.mtx
+==1709011== Profiling application: ./cg_solver lap2D_5pt_n100.mtx
+Time for CG (dense solver)  = 37.8851 [s]
+==1709011== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   98.76%  36.9749s      3251  11.373ms  11.298ms  11.525ms  void cu_dgemv<double>(double*, double const *, double const *, double, double, unsigned long, unsigned long)
+                    0.49%  181.64ms      6501  27.939us  27.264us  28.960us  void cu_ddot<double>(double*, double const *, double const *, unsigned long)
+                    0.46%  170.47ms      3253  52.404us  1.0870us  166.81ms  [CUDA memcpy HtoD]
+                    0.11%  42.133ms      9749  4.3210us  4.0950us  14.272us  void cu_daxpy<double>(double const *, double const *, double*, unsigned long)
+                    0.07%  25.192ms      9749  2.5840us  2.4310us  3.8400us  [CUDA memcpy DtoD]
+                    0.05%  17.407ms      3250  5.3560us  5.2790us  7.8080us  void compute_alpha<double>(double*, double const *, double const *)
+                    0.04%  13.749ms      3249  4.2310us  4.1910us  4.6080us  void compute_beta<double>(double*, double const *, double const *)
+                    0.03%  11.035ms      3250  3.3950us  3.3270us  13.888us  void cu_negate<double>(double*, unsigned long)
+                    0.01%  4.1073ms      3250  1.2630us  1.2470us  3.5200us  [CUDA memcpy DtoH]
+                    0.00%  17.151us         8  2.1430us  1.1200us  3.4560us  [CUDA memset]
+                    0.00%  4.5760us         1  4.5760us  4.5760us  4.5760us  void cu_daxpy<double>(double, double const *, double*, unsigned long)
+      API calls:   99.20%  37.5209s     16252  2.3087ms  4.5200us  166.98ms  cudaMemcpy
+                    0.47%  176.67ms     29251  6.0390us  3.4430us  14.028ms  cudaLaunchKernel
+                    0.33%  125.70ms        11  11.427ms  2.5690us  125.52ms  cudaMalloc
+                    0.00%  816.70us        11  74.245us  2.7320us  504.33us  cudaFree
+                    0.00%  113.11us       101  1.1190us     114ns  47.002us  cuDeviceGetAttribute
+                    0.00%  105.96us         8  13.244us  2.5570us  52.976us  cudaMemset
+                    0.00%  8.8040us         1  8.8040us  8.8040us  8.8040us  cuDeviceGetPCIBusId
+                    0.00%  8.3130us         1  8.3130us  8.3130us  8.3130us  cuDeviceGetName
+                    0.00%  1.0660us         3     355ns     177ns     701ns  cuDeviceGetCount
+                    0.00%     629ns         1     629ns     629ns     629ns  cuDeviceTotalMem
+                    0.00%     571ns         2     285ns     141ns     430ns  cuDeviceGet
+                    0.00%     318ns         1     318ns     318ns     318ns  cuModuleGetLoadingMode
+                    0.00%     188ns         1     188ns     188ns     188ns  cuDeviceGetUuid

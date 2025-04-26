@@ -198,6 +198,17 @@ __global__ void compute_beta(T* beta, const T* rsold, const T* rsnew);
 
 template <typename T>
 /**
+ * @brief Fills and array with zeros.
+ * 
+ * @tparam T datatype
+ * @param dst pointer to the array
+ * @param count number of elements
+ */
+
+__host__ void zero_fill_array(T* dst, size_t count);
+
+template <typename T>
+/**
  * @brief Frees a block of allocated memory on the CUDA device
  * 
  * @tparam T datatype

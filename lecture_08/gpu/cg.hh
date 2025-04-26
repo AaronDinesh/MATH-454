@@ -20,8 +20,8 @@ public:
   void init_source_term(double h);
   virtual void solve(std::vector<double> & x) = 0;
 
-  inline int m() const { return m_m; }
-  inline int n() const { return m_n; }
+  inline size_t m() const { return (size_t) m_m; }
+  inline size_t n() const { return (size_t) m_n; }
 
   void tolerance(double tolerance) { m_tolerance = tolerance; }
 

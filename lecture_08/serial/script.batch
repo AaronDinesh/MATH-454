@@ -1,0 +1,14 @@
+#!/bin/bash -l
+
+#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --qos=math-454
+#SBATCH --account=math-454
+#SBATCH --output=./cpu_out
+
+module purge
+module load gcc cuda
+
+srun ./cgsolver lap2D_5pt_n100.mtx

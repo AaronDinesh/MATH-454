@@ -6,11 +6,11 @@ CC = gcc
 # Output executable name
 TARGET = cg_solver
 
-# Compiler flags as specified
-CXXFLAGS := -std=c++11 -O3 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -pedantic 
-CCFLAGS := -O3 
+
+CXXFLAGS := -std=c++11 -O3 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -pedantic -g
+CCFLAGS := -O3 -g
 NVCCFLAGS := -std=c++11 -O3 --Werror cross-execution-space-call,deprecated-declarations \
-             --gpu-architecture=compute_70 --gpu-code=sm_70 --use_fast_math
+             --gpu-architecture=compute_70 --gpu-code=sm_70 --use_fast_math -G
 
 # CUDA specific link flags
 CUDA_LDFLAGS := -lcudart
