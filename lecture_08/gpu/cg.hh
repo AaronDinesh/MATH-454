@@ -18,7 +18,7 @@ class Solver {
 public:
   virtual void read_matrix(const std::string & filename) = 0;
   void init_source_term(double h);
-  virtual void solve(std::vector<double> & x) = 0;
+  virtual void solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) = 0;
 
   inline size_t m() const { return (size_t) m_m; }
   inline size_t n() const { return (size_t) m_n; }
@@ -36,7 +36,7 @@ class CGSolver : public Solver {
 public:
   CGSolver() = default;
   virtual void read_matrix(const std::string & filename);
-  virtual void solve(std::vector<double> & x);
+  virtual void solve(std::vector<double> & x, size_t THREADS_PER_BLOCK);
 private:
   Matrix m_A;
 };

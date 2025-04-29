@@ -7,6 +7,10 @@
 #include "cuda_ops.hh"
 #include <cublas_v2.h>
 
+#if MAX_THREADED_MODE == 0
+  #define NUM_BLOCKS 1
+#endif
+
 
 /*
     cgsolver solves the linear equation A*x = b where A is
@@ -111,7 +115,7 @@ void CGSolver::solve(std::vector<double> & x) {
 }
 */
 
-void CGSolver::solve(std::vector<double> & x) {
+void CGSolver::solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) {
   double* d_x = nullptr;
   copy_to_device<double>(d_x, x.data(), m_n);
   
@@ -151,15 +155,23 @@ void CGSolver::solve(std::vector<double> & x) {
     double* h_rsold = nullptr;
   #endif
 
-  int grid_size_m = (m_m + THREADS_PER_BLOCK  - 1) / THREADS_PER_BLOCK;
+  #if MAX_THREADED_MODE
+    int grid_size_m = (m_m + THREADS_PER_BLOCK  - 1) / THREADS_PER_BLOCK;
+  #else
+    int grid_size_m = NUM_BLOCKS;
+  #endif
   // r = b - A * x;
-  
   //Might have to switch out with cublas 
   cu_dgemv<double><<<grid_size_m, THREADS_PER_BLOCK>>>(d_Ap, d_A, d_x, 1., 0., m_m, m_n);
 
   assign_on_device<double>(d_b, d_r, m_n);
 
-  int grid_size_n = (m_n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;  // Round up
+  #if MAX_THREADED_MODE
+    int grid_size_n = (m_n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;  // Round up
+  #else
+    int grid_size_n = NUM_BLOCKS;
+  #endif
+
   cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(-1.,  d_Ap, d_r, m_n);
 
   assign_on_device<double>(d_r, d_p, m_n);
