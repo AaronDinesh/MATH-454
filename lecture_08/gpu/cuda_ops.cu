@@ -131,7 +131,8 @@ __global__ void cu_dgemm(T* C, const T* A, const T* B, const T alpha, const T be
 
     for (size_t idx = thread_id; idx < total_elements; idx += total_threads) {
       size_t row = idx / n;
-      size_t col = idx % n;
+      size_t 
+  col = idx % n;
 
       T sum = 0.0f;
       #pragma unroll 4
@@ -151,7 +152,8 @@ __global__ void cu_negate(T* a, size_t n){
       *a = -(*a);
     }
     return;
-    }
+  }
+  
   #if MAX_THREADED_MODE
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
@@ -195,18 +197,33 @@ __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
   #endif
 }
 
+// template <typename T>
+// __host__ void copy_from_device(T* h_a, const T* d_a, size_t count){
+//   size_t size = count * sizeof(T);
+//   cudaError_t cudaStatus = cudaMemcpy(static_cast<void *>(h_a), static_cast<const void*>(d_a), size, cudaMemcpyDeviceToHost); 
+  
+//   #if ERROR_CHECKING
+//     if (cudaStatus != cudaSuccess) {
+//       std::cout << "copy_from_device failed because cudaMemcpy failed! Cuda error below." << std::endl;
+//       std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+//     }
+//   #endif
+// }
+
 template <typename T>
 __host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
   size_t size = count * sizeof(T);
 
-  cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
+  if(!d_a){ 
+    cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
   
-  #if ERROR_CHECKING
-    if (cudaStatus != cudaSuccess) {
-      std::cout << "copy_to_device failed because cudaMalloc failed! Cuda error below." << std::endl;
-      std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
-    }
-  #endif
+    #if ERROR_CHECKING
+      if (cudaStatus != cudaSuccess) {
+        std::cout << "copy_to_device failed because cudaMalloc failed! Cuda error below." << std::endl;
+        std::cout << "Cuda error:" << cudaGetErrorString(cudaStatus) << std::endl;
+      }
+    #endif
+  }
 
   cudaStatus = cudaMemcpy((void*) d_a, (const void*) h_a, size, cudaMemcpyHostToDevice);
   
@@ -316,6 +333,7 @@ __global__ void compute_beta(T* beta, const T* rsold, const T* rsnew){
 
 // For device functions
 template void copy_to_device<double>(double*&, const double*, size_t);
+//template void copy_from_device<double>(double*, const double*, size_t);
 template void copy_from_device<double>(double*&, const double*, size_t);
 template void zero_malloc_on_device<double>(double*&, size_t);
 template void assign_on_device<double>(const double*, double*, size_t);

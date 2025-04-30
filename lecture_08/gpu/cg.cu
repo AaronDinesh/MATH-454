@@ -189,7 +189,7 @@ void CGSolver::solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) {
 
     compute_alpha<double><<<1, 1>>>(d_alpha, d_rsold, ddot_result);
 
-    // x = x + alpha * p;
+    // d_x = d_x + alpha * d_p;
     cu_daxpy<double><<<grid_size_n, THREADS_PER_BLOCK>>>(d_alpha,  d_p, d_x, m_n);
 
     // r = r - alpha * Ap; (next two lines)
@@ -209,7 +209,7 @@ void CGSolver::solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) {
     }
 
     //At this point h_rsnew is safe to use
-    if(*h_rsnew < m_tolerance){
+    if(std::sqrt(*h_rsnew) < m_tolerance){
       break;
     }
 
@@ -227,10 +227,13 @@ void CGSolver::solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) {
     #if DEBUG
       copy_from_device<double>(h_rsold, d_rsold, 1);
       std::cout << "\t[STEP " << k << "] residual = " << std::scientific
-                << std::sqrt(*h_rsold) << std::endl;
-    #endif
-  }
-
+      << std::sqrt(*h_rsold) << std::endl;
+      #endif
+    }
+  
+  double* x_data_ptr = x.data();
+  copy_from_device<double>(x_data_ptr, d_x, (size_t) m_n); 
+  
   #if DEBUG
     zero_fill_array<double>(d_r, m_n);
     
@@ -263,7 +266,8 @@ void CGSolver::solve(std::vector<double> & x, size_t THREADS_PER_BLOCK) {
               << ", ||Ax - b||/||b|| = " << res << std::endl;
     
   #endif
-
+  
+  m_k = k;
   free_on_device<double>(d_x);
   free_on_device<double>(d_r);
   free_on_device<double>(d_p);

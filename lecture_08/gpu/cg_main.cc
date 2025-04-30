@@ -34,16 +34,17 @@ int main(int argc, char ** argv) {
   #if SCALING_EXPERIMENTS == 0
     std::cout << "Call CG dense on matrix size " << m << " x " << n << ")"
                 << std::endl;
+    printf("Using %d threads per block\n", std::atoi(argv[2]));
   #endif
 
   auto t1 = clk::now();
-  solver.solve(x_d, std::stoi(argv[2]));
+  solver.solve(x_d, (size_t) std::atoi(argv[2]));
   second elapsed = clk::now() - t1;
   
   #if SCALING_EXPERIMENTS == 0
     std::cout << "Time for CG (dense solver)  = " << elapsed.count() << " [s]\n";
   #else
-    std::cout << std::stoi(argv[2]) << "," << elapsed.count() << std::endl;
+    std::cout << solver.get_final_iter_count() << "," << std::stoi(argv[2]) << "," << elapsed.count() << std::endl;
   #endif
   
   return 0;

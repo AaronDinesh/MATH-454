@@ -116,6 +116,19 @@ template <typename T>
 __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count);
 
 
+// template <typename T>
+// /**
+//  * @brief Copies data from the CUDA device to the host using a raw pointer
+//  * 
+//  * @tparam T datatype
+//  * @param h_a pointer to the host array
+//  * @param d_a pointer to the device array
+//  * @param count number of elements to copy
+//  */
+
+// __host__ void copy_from_device(T* h_a, const T* d_a, size_t count);
+
+
 template <typename T>
 /**
  * @brief Copies data from the host to the CUDA device

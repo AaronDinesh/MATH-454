@@ -37,8 +37,10 @@ public:
   CGSolver() = default;
   virtual void read_matrix(const std::string & filename);
   virtual void solve(std::vector<double> & x, size_t THREADS_PER_BLOCK);
+  int get_final_iter_count() { return m_k; }
 private:
   Matrix m_A;
+  int m_k;
 };
 
 #endif /* __CG_HH__ */
