@@ -214,8 +214,10 @@ template <typename T>
 __host__ void copy_to_device(T* &d_a, const T* h_a, size_t count){
   size_t size = count * sizeof(T);
 
+  cudaError_t cudaStatus;
+
   if(!d_a){ 
-    cudaError_t cudaStatus = cudaMalloc((void**) &d_a, size);
+    cudaStatus = cudaMalloc((void**) &d_a, size);
   
     #if ERROR_CHECKING
       if (cudaStatus != cudaSuccess) {
