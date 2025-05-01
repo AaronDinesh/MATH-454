@@ -11,6 +11,7 @@
 module purge
 module load gcc cuda
 
-threads=$1
+run_number=$1
+threads=$2
 
-srun --output="./runs/${threads}_gpu_cudahostmalloc.txt" ./cg_solver lap2D_5pt_n100.mtx ${threads}
+srun --output="./runs/${threads}_gpu_run_${run_number}.txt" ./cg_solver lap2D_5pt_n100.mtx ${threads}

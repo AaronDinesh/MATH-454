@@ -1,0 +1,2 @@
+Call CG dense on matrix size 10000 x 10000)
+Time for CG (dense solver)  = 26.2346 [s]

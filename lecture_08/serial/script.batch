@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --qos=math-454
 #SBATCH --account=math-454
-#SBATCH --output=./cpu_out
+#SBATCH --output=./cpu_out2
 
 module purge
 module load gcc cuda
