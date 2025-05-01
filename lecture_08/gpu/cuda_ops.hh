@@ -57,7 +57,24 @@ template <typename T>
  * @param y The second input array
  * @param n The number of elements
  */
-__global__ void cu_ddot(T* c, const T* x, const T* y, size_t n);
+__global__ void cu_ddot(T* result, const T* x, const T* y, size_t n);
+
+
+template <typename T>
+/**
+ * @brief Helper function to call the cu_ddot operation with the correct shared memory size
+ * 
+ * @tparam T datatype
+ * @param result The output array
+ * @param x The first input array
+ * @param y The second input array
+ * @param n The number of elements
+ * @param grid_size The number of blocks
+ * @param block_size The number of threads per block
+ */
+__host__ void launch_cu_ddot(T* result, const T* x, const T* y, size_t n, int grid_size, int block_size);
+
+
 
 template <typename T>
 /**
@@ -114,19 +131,6 @@ template <typename T>
  * @param count number of elements to copy
  */
 __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count);
-
-
-// template <typename T>
-// /**
-//  * @brief Copies data from the CUDA device to the host using a raw pointer
-//  * 
-//  * @tparam T datatype
-//  * @param h_a pointer to the host array
-//  * @param d_a pointer to the device array
-//  * @param count number of elements to copy
-//  */
-
-// __host__ void copy_from_device(T* h_a, const T* d_a, size_t count);
 
 
 template <typename T>

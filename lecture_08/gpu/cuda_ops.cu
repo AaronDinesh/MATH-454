@@ -58,22 +58,97 @@ __global__ void cu_daxpy(const T* alpha, const T* x, T* y, size_t n) {
 }
 
 
+// template <typename T>
+// __global__ void cu_ddot(T* c, const T* x, const T* y, size_t n){
+//   #if MAX_THREADED_MODE
+//     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     if (idx < n) {
+//       T partial_product = x[idx] * y[idx];
+//       atomicAdd(c, partial_product);
+//     }
+//   #else
+//     size_t total_threads = blockDim.x * gridDim.x;
+//     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+//     #pragma unroll 4
+//     for (size_t i = idx; i < n; i += total_threads) {
+//       T partial_product = x[i] * y[i];
+//       atomicAdd(c, partial_product);
+//     }
+//   #endif
+// }
+
 template <typename T>
-__global__ void cu_ddot(T* c, const T* x, const T* y, size_t n){
+__global__ void cu_ddot(T* result, const T* x, const T* y, size_t n) {
+  // Shared memory for per-block partial sums
+  extern __shared__ T sdata[];
+  
+  // Initialize shared memory to zero
+  sdata[threadIdx.x] = 0;
+  
   #if MAX_THREADED_MODE
+    // One-to-one mapping: each thread handles one element
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < n) {
-      T partial_product = x[idx] * y[idx];
-      atomicAdd(c, partial_product);
+      sdata[threadIdx.x] = x[idx] * y[idx];
     }
   #else
+    // Grid-stride loop: each thread handles multiple elements
     size_t total_threads = blockDim.x * gridDim.x;
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
+    
+    // Initialize accumulator
+    T thread_sum = 0;
+    
+    // Each thread computes the sum of its assigned elements
     #pragma unroll 4
     for (size_t i = idx; i < n; i += total_threads) {
-      T partial_product = x[i] * y[i];
-      atomicAdd(c, partial_product);
+      thread_sum += x[i] * y[i];
+    }
+    
+    // Store thread sum in shared memory
+    sdata[threadIdx.x] = thread_sum;
+  #endif
+  
+  __syncthreads();
+  
+  // Perform parallel reduction in shared memory
+  // Reduce with sequential addressing to avoid bank conflicts
+  for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (threadIdx.x < s) {
+      sdata[threadIdx.x] += sdata[threadIdx.x + s];
+    }
+    __syncthreads();
+  }
+  
+  // First thread in each block writes the block's result to global memory
+  if (threadIdx.x == 0) {
+    atomicAdd(result, sdata[0]);
+  }
+}
+
+template <typename T>
+__host__ void launch_cu_ddot(T* result, const T* x, const T* y, size_t n, int grid_size, int block_size) {
+  // Ensure result is initialized to zero before kernel launch
+  cudaMemset(result, 0, sizeof(T));
+  
+  // Calculate shared memory size (block_size elements of type T)
+  size_t shared_mem_size = block_size * sizeof(T);
+  
+  // Launch kernel with shared memory allocation
+  cu_ddot<T><<<grid_size, block_size, shared_mem_size>>>(result, x, y, n);
+  
+  // Check for errors (if error checking is enabled)
+  #if ERROR_CHECKING
+    cudaError_t cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "cu_ddot kernel launch failed: " << cudaGetErrorString(cudaStatus) << std::endl;
+    }
+    
+    // Make sure kernel execution is complete
+    cudaStatus = cudaDeviceSynchronize();
+    if (cudaStatus != cudaSuccess) {
+      std::cout << "cudaDeviceSynchronize failed: " << cudaGetErrorString(cudaStatus) << std::endl;
     }
   #endif
 }
@@ -86,7 +161,6 @@ __global__ void cu_dgemv(T* c, const  T* A, const T* x, const T alpha, const T b
     if (matrix_row < m) {
       T sum = 0;
 
-      #pragma unroll 8
       for (size_t i = 0; i < n; i++) {
         sum += A[matrix_row * n + i] * x[i];
       }
@@ -176,6 +250,7 @@ __host__ void copy_from_device(T* &h_a, const T* d_a, size_t count){
 
   if (!h_a) {
     h_a = (T*) malloc(size);
+    //cudaMallocHost((void **)& h_a, size);
   }
 
   #if ERROR_CHECKING
@@ -342,11 +417,14 @@ template void assign_on_device<double>(const double*, double*, size_t);
 template void assign_on_device<double>(const double, double*);
 template void free_on_device<double>(double*&);
 template void zero_fill_array<double>(double*, size_t);
+template void launch_cu_ddot<double>(double*, const double*, const double*, size_t, int, int);
 
 // For CUDA kernels (__global__)
 template __global__ void cu_daxpy<double>(const double*, const double*, double*, size_t);
 template __global__ void cu_daxpy<double>(const double, const double*, double*, size_t);
+
 template __global__ void cu_ddot<double>(double*, const double*, const double*, size_t);
+
 template __global__ void cu_negate<double>(double*, size_t);
 template __global__ void cu_dgemv<double>(double*, const double*, const double*, double, double, size_t, size_t);
 template __global__ void compute_beta<double>(double*, const double*, const double*);

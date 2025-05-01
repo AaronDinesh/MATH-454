@@ -6,11 +6,11 @@
 #SBATCH --gres=gpu:1
 #SBATCH --qos=math-454
 #SBATCH --account=math-454
-#SBATCH --output=./gpu_test.out
+#SBATCH --output=/dev/null
 
 module purge
 module load gcc cuda
 
 threads=$1
 
-srun ./cg_solver lap2D_5pt_n100.mtx ${threads}
+srun --output="./runs/${threads}_gpu_cudahostmalloc.txt" ./cg_solver lap2D_5pt_n100.mtx ${threads}

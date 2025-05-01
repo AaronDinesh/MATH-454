@@ -4,7 +4,7 @@
 //#define THREADS_PER_BLOCK 256
 
 //Set this to 0 if you want to turn off debugging mode
-#define DEBUG 1
+#define DEBUG 0
 
 //Set this to 0 if you want to turn off max threading mode 
 // to do block scaling experiments. Or set this to 1 and pass 
