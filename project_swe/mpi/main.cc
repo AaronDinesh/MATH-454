@@ -4,6 +4,7 @@
 #include "swe.hh"
 #include <mpi.h>
 #include <string>
+#include <iostream>
 #include <cstddef>
 #include <chrono>
 
