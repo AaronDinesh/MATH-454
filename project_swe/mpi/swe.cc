@@ -359,11 +359,11 @@ double SWESolver::compute_time_step(const std::vector<double> &h, const std::vec
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   //Calculating the row range for this index
-  std::size_t row_per_rank = (ny_ - 2) / size;
-  std::stize_t rem = (ny_ - 2) % size;
+  std::size_t rows_per_rank = (ny_ - 2) / size;
+  std::size_t remainder = (ny_ - 2) % size;
   std::size_t j_start = 1 + rank * rows_per_rank + std::min<std::size_t>(rank, remainder);
   std::size_t j_end = j_start + rows_per_rank - 1;
-  if (rank < remainder) j_end++; 
+  if ((size_t) rank < remainder) j_end++; 
 
   for (std::size_t j = j_start; j <= j_end; ++j) {
     for (std::size_t i = 1; i < nx_ - 1; ++i) {
