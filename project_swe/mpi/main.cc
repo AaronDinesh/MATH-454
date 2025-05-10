@@ -1,11 +1,16 @@
-#include "swe.hh"
+// TIME TO BEAT (109 s
 
+
+#include "swe.hh"
+#include <mpi.h>
 #include <string>
 #include <cstddef>
+#include <chrono>
 
-int
-main()
-{
+int main(){
+  MPI_Init(NULL, NULL);
+
+
   // Uncomment the option you want to run.
 
   // Option 1 - Solving simple problem: water drops in a box
@@ -18,7 +23,15 @@ main()
   const bool full_log = false;
 
   SWESolver solver(test_case_id, nx, ny);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  
   solver.solve(Tend, full_log, output_n, output_fname);
+  
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+  std::cout << "Time taken by function: "
+            << duration.count() << " seconds" << std::endl;
 
   // // Option 2 - Solving analytical (dummy) tsunami example.
   // const int test_case_id = 2;  // Analytical tsunami test case
@@ -49,5 +62,6 @@ main()
   // SWESolver solver(fname, size, size);
   // solver.solve(Tend, full_log, output_n, output_fname);
 
+  MPI_Finalize();
   return 0;
 }

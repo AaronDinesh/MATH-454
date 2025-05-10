@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cmath>
 #include <memory>
+#include <mpi.h>
 
 namespace
 {
@@ -283,10 +284,9 @@ SWESolver::init_dx_dy()
   }
 }
 
-void
-SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix)
-{
+void SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix){
   std::shared_ptr<XDMFWriter> writer;
+  
   if (output_n > 0)
   {
     writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
@@ -312,8 +312,10 @@ SWESolver::solve(const double Tend, const bool full_log, const std::size_t outpu
 
     const double T1 = T + dt;
 
-    printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
-    std::cout << (full_log ? "\n" : "\r") << std::flush;
+    #if DEBUG == 1
+      printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
+      std::cout << (full_log ? "\n" : "\r") << std::flush;
+    #endif
 
     this->update_bcs(h0, hu0, hv0, h, hu, hv);
 
@@ -349,36 +351,64 @@ SWESolver::solve(const double Tend, const bool full_log, const std::size_t outpu
   std::cout << "Finished solving SWE." << std::endl;
 }
 
-double
-SWESolver::compute_time_step(const std::vector<double> &h,
-                             const std::vector<double> &hu,
-                             const std::vector<double> &hv,
-                             const double T,
-                             const double Tend) const
-{
-  double max_nu_sqr = 0.0;
-  double au{0.0};
-  double av{0.0};
-  for (std::size_t j = 1; j < ny_ - 1; ++j)
-  {
-    for (std::size_t i = 1; i < nx_ - 1; ++i)
-    {
-      au = std::max(au, std::fabs(at(hu, i, j)));
-      av = std::max(av, std::fabs(at(hv, i, j)));
-      const double nu_u = std::fabs(at(hu, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
-      const double nu_v = std::fabs(at(hv, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
-      max_nu_sqr = std::max(max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
+double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const{
+  double local_max_nu_sqr = 0.0;
+  
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  //Calculating the row range for this index
+  std::size_t row_per_rank = (ny_ - 2) / size;
+  std::stize_t rem = (ny_ - 2) % size;
+  std::size_t j_start = 1 + rank * rows_per_rank + std::min<std::size_t>(rank, remainder);
+  std::size_t j_end = j_start + rows_per_rank - 1;
+  if (rank < remainder) j_end++; 
+
+  for (std::size_t j = j_start; j <= j_end; ++j) {
+    for (std::size_t i = 1; i < nx_ - 1; ++i) {
+      const double hu_ij = at(hu, i, j);
+      const double hv_ij = at(hv, i, j);
+      const double nu_u = std::fabs(hu_ij) / at(h, i, j) + sqrt(g * at(h, i, j));
+      const double nu_v = std::fabs(hv_ij) / at(h, i, j) + sqrt(g * at(h, i, j));
+      local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
     }
   }
 
+  double global_max_nu_sqr;
+  MPI_Allreduce(&local_max_nu_sqr, &global_max_nu_sqr, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+
   const double dx = size_x_ / nx_;
   const double dy = size_y_ / ny_;
-  double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu_sqr));
+  const double dt = std::min(dx, dy) / std::sqrt(2.0 * global_max_nu_sqr);
   return std::min(dt, Tend - T);
+  
+  
+  // double max_nu_sqr = 0.0;
+  // double au{0.0}; Seemingly au is never used.... so why is it calculated??
+  // double av{0.0}; Seemingly av is never used.... so why is it calculated??
+  // for (std::size_t j = 1; j < ny_ - 1; ++j)
+  // {
+  //   for (std::size_t i = 1; i < nx_ - 1; ++i)
+  //   {
+  //     au = std::max(au, std::fabs(at(hu, i, j)));
+  //     av = std::max(av, std::fabs(at(hv, i, j)));
+  //     const double nu_u = std::fabs(at(hu, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
+  //     const double nu_v = std::fabs(at(hv, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
+  //     max_nu_sqr = std::max(max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
+  //   }
+  // }
+
+  // const double dx = size_x_ / nx_;
+  // const double dy = size_y_ / ny_;
+  // double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu_sqr));
+  // return std::min(dt, Tend - T);
+
+    
+
 }
 
-void
-SWESolver::compute_kernel(const std::size_t i,
+void SWESolver::compute_kernel(const std::size_t i,
                           const std::size_t j,
                           const double dt,
                           const std::vector<double> &h0,

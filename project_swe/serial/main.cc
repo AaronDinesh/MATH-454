@@ -2,6 +2,8 @@
 
 #include <string>
 #include <cstddef>
+#include <iostream>
+#include <chrono>
 
 int
 main()
@@ -18,7 +20,16 @@ main()
   const bool full_log = false;
 
   SWESolver solver(test_case_id, nx, ny);
+
+  auto start = std::chrono::high_resolution_clock::now();
+
   solver.solve(Tend, full_log, output_n, output_fname);
+
+
+  auto end = std::chrono::high_resolution_clock::now();
+
+  auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+  std::cout << "Time taken: " << duration.count() << " s" << std::endl;
 
   // // Option 2 - Solving analytical (dummy) tsunami example.
   // const int test_case_id = 2;  // Analytical tsunami test case

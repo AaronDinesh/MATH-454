@@ -1,0 +1,11 @@
+#!/bin/bash -l
+
+#SBATCH --nodes=1
+#SBATCH --time=01:00:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --qos=math-454
+#SBATCH --account=math-454
+
+perf record -F 4000 -m 512 -o ./serial_4k_512.perf --call-graph dwarf ./swe
+#./swe
