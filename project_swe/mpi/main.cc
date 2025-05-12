@@ -1,4 +1,4 @@
-// TIME TO BEAT (109 s
+// TIME TO BEAT 109 s
 
 
 #include "swe.hh"

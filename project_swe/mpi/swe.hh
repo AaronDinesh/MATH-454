@@ -148,13 +148,17 @@ private:
    * @param hv The y water velocity in the current time step.
    * @param T Current time.
    * @param Tend Final time.
+   * @param rank The rank of the MPI process
+   * @param size The total size of the MPI Pool
    * @return Compute time step.
    */
   double compute_time_step(const std::vector<double> &h,
                            const std::vector<double> &hu,
                            const std::vector<double> &hv,
                            const double T,
-                           const double Tend) const;
+                           const double Tend,
+                           const int rank,
+                           const int size) const;
 
   /**
    * @brief Solve one step of the SWE.

@@ -16,13 +16,7 @@
 namespace
 {
 
-void
-read_2d_array_from_DF5(const std::string &filename,
-                       const std::string &dataset_name,
-                       std::vector<double> &data,
-                       std::size_t &nx,
-                       std::size_t &ny)
-{
+void read_2d_array_from_DF5(const std::string &filename, const std::string &dataset_name, std::vector<double> &data, std::size_t &nx, std::size_t &ny){
   hid_t file_id, dataset_id, dataspace_id;
   hsize_t dims[2];
   herr_t status;
@@ -286,12 +280,15 @@ SWESolver::init_dx_dy()
 
 void SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix){
   std::shared_ptr<XDMFWriter> writer;
-  
-  if (output_n > 0)
-  {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+  if (output_n > 0 && rank == 0){
     writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
     writer->add_h(h0_, 0.0);
   }
+
 
   double T = 0.0;
 
@@ -308,7 +305,7 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
   std::size_t nt = 1;
   while (T < Tend)
   {
-    const double dt = this->compute_time_step(h0, hu0, hv0, T, Tend);
+    const double dt = this->compute_time_step(h0, hu0, hv0, T, Tend, rank, size);
 
     const double T1 = T + dt;
 
@@ -321,7 +318,7 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
 
     this->solve_step(dt, h0, hu0, hv0, h, hu, hv);
 
-    if (output_n > 0 && nt % output_n == 0)
+    if (output_n > 0 && nt % output_n == 0 && rank==0)
     {
       writer->add_h(h, T1);
     }
@@ -343,7 +340,7 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
     hv1_ = hv0;
   }
 
-  if (output_n > 0)
+  if (output_n > 0 && rank == 0)
   {
     writer->add_h(h1_, T);
   }
@@ -351,28 +348,28 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
   std::cout << "Finished solving SWE." << std::endl;
 }
 
-double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const{
+double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend, const int rank, const int size) const{
   double local_max_nu_sqr = 0.0;
-  
-  int rank, size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  //Calculating the row range for this index
-  std::size_t rows_per_rank = (ny_ - 2) / size;
-  std::size_t remainder = (ny_ - 2) % size;
-  std::size_t j_start = 1 + rank * rows_per_rank + std::min<std::size_t>(rank, remainder);
-  std::size_t j_end = j_start + rows_per_rank - 1;
-  if ((size_t) rank < remainder) j_end++; 
+  std::size_t total_points = (ny_ - 2) * (nx_ - 2);
+  std::size_t points_per_rank = total_points / size;
+  std::size_t remainder = total_points % size;
 
-  for (std::size_t j = j_start; j <= j_end; ++j) {
-    for (std::size_t i = 1; i < nx_ - 1; ++i) {
-      const double hu_ij = at(hu, i, j);
-      const double hv_ij = at(hv, i, j);
-      const double nu_u = std::fabs(hu_ij) / at(h, i, j) + sqrt(g * at(h, i, j));
-      const double nu_v = std::fabs(hv_ij) / at(h, i, j) + sqrt(g * at(h, i, j));
-      local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
-    }
+  std::size_t start = rank * points_per_rank + std::min<std::size_t>(rank, remainder);
+  std::size_t end = start + points_per_rank - 1;
+  if ((std::size_t)rank < remainder) end += 1; 
+
+  #pragma unroll 4
+  for (std::size_t index = start; index < end; ++index) {
+    std::size_t j = 1 + index / (nx_ - 2);
+    std::size_t i = 1 + index % (nx_ - 2);
+    const double hu_ij = at(hu, i, j);
+    const double hv_ij = at(hv, i, j);
+    const double h_ij = at(h, i, j);
+
+    const double nu_u = std::fabs(hu_ij) / h_ij + sqrt(g * h_ij);
+    const double nu_v = std::fabs(hv_ij) / h_ij + sqrt(g * h_ij);
+    local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
   }
 
   double global_max_nu_sqr;

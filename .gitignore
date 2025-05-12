@@ -11,3 +11,4 @@ lecture_05/Aaron_Dinesh_387804/matrix/lap2D_5pt_n1000.mtx
 lecture_05/Aaron_Dinesh_387804/matrix/lap2D_5pt_n600.mtx
 project_swe/data/*
 **/serial_4k_512.perf
+**/*.h5
