@@ -23,6 +23,10 @@ int main(){
   const std::string output_fname = "water_drops";
   const bool full_log = false;
 
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+
   SWESolver solver(test_case_id, nx, ny);
 
   auto start = std::chrono::high_resolution_clock::now();
@@ -31,9 +35,11 @@ int main(){
   
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-  std::cout << "Time taken by function: "
-            << duration.count() << " seconds" << std::endl;
 
+  if (rank == 0){
+    std::cout << "Time taken by function: "
+              << duration.count() << " seconds" << std::endl;
+  }
   // // Option 2 - Solving analytical (dummy) tsunami example.
   // const int test_case_id = 2;  // Analytical tsunami test case
   // const double Tend = 1.0;     // Simulation time in hours

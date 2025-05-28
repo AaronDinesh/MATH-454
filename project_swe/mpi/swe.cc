@@ -170,9 +170,7 @@ SWESolver::init_gaussian()
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_dummy_tsunami()
-{
+void SWESolver::init_dummy_tsunami(){
   hu0_.resize(nx_ * ny_);
   hv0_.resize(nx_ * ny_);
   std::fill(hu0_.begin(), hu0_.end(), 0.0);
@@ -219,9 +217,7 @@ SWESolver::init_dummy_tsunami()
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_dummy_slope()
-{
+void SWESolver::init_dummy_slope(){
   hu0_.resize(nx_ * ny_);
   hv0_.resize(nx_ * ny_);
   std::fill(hu0_.begin(), hu0_.end(), 0.0);
@@ -260,9 +256,7 @@ SWESolver::init_dummy_slope()
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_dx_dy()
-{
+void SWESolver::init_dx_dy(){
   zdx_.resize(this->z_.size(), 0.0);
   zdy_.resize(this->z_.size(), 0.0);
 
@@ -300,9 +294,11 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
   std::vector<double> &hu0 = hu0_;
   std::vector<double> &hv0 = hv0_;
 
-  std::cout << "Solving SWE..." << std::endl;
-
+  #if DEBUG == 1
+    std::cout << "Solving SWE..." << std::endl;
+  #endif 
   std::size_t nt = 1;
+
   while (T < Tend)
   {
     const double dt = this->compute_time_step(h0, hu0, hv0, T, Tend, rank, size);
@@ -359,16 +355,16 @@ double SWESolver::compute_time_step(const std::vector<double> &h, const std::vec
   std::size_t end = start + points_per_rank - 1;
   if ((std::size_t)rank < remainder) end += 1; 
 
-  #pragma unroll 4
-  for (std::size_t index = start; index < end; ++index) {
+  for (std::size_t index = start; index <= end; ++index) {
     std::size_t j = 1 + index / (nx_ - 2);
     std::size_t i = 1 + index % (nx_ - 2);
     const double hu_ij = at(hu, i, j);
     const double hv_ij = at(hv, i, j);
     const double h_ij = at(h, i, j);
+    const double sqrt_term = sqrt(g*h_ij);
 
-    const double nu_u = std::fabs(hu_ij) / h_ij + sqrt(g * h_ij);
-    const double nu_v = std::fabs(hv_ij) / h_ij + sqrt(g * h_ij);
+    const double nu_u = std::fabs(hu_ij) / h_ij + sqrt_term;
+    const double nu_v = std::fabs(hv_ij) / h_ij + sqrt_term;
     local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
   }
 
@@ -405,16 +401,7 @@ double SWESolver::compute_time_step(const std::vector<double> &h, const std::vec
 
 }
 
-void SWESolver::compute_kernel(const std::size_t i,
-                          const std::size_t j,
-                          const double dt,
-                          const std::vector<double> &h0,
-                          const std::vector<double> &hu0,
-                          const std::vector<double> &hv0,
-                          std::vector<double> &h,
-                          std::vector<double> &hu,
-                          std::vector<double> &hv) const
-{
+void SWESolver::compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
   const double dx = size_x_ / nx_;
   const double dy = size_x_ / ny_;
   const double C1x = 0.5 * dt / dx;
@@ -475,31 +462,25 @@ void SWESolver::compute_kernel(const std::size_t i,
   //     hv0(3:nx,2:nx-1).^2./h0(3:nx,2:nx-1) - 0.5*g*h0(3:nx,2:nx-1).^2  );
 }
 
-void
-SWESolver::solve_step(const double dt,
-                      const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const
-{
-  for (std::size_t j = 1; j < ny_ - 1; ++j)
-  {
-    for (std::size_t i = 1; i < nx_ - 1; ++i)
-    {
-      this->compute_kernel(i, j, dt, h0, hu0, hv0, h, hu, hv);
-    }
-  }
-}
+void SWESolver::solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  std::size_t total_rows = ny_ - 2;
+  std::size_t rows_per_rank = total_rows / size;
+  std::size_t remainder = total_rows % size;  
 
+  std::size_t j_start = 1 + rank * rows_per_rank + std::min<std::size_t>(rank, remainder);
+  std::size_t j_end = j_start + rows_per_rank - 1; 
+  
+  // for (std::size_t j = 1; j < ny_ - 1; ++j){
+  //   for (std::size_t i = 1; i < nx_ - 1; ++i){
+  //     this->compute_kernel(i, j, dt, h0, hu0, hv0, h, hu, hv);
+  //   }
+  // }
+}
 void
-SWESolver::update_bcs(const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const
+SWESolver::update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const
 {
   const double coef = this->reflective_ ? -1.0 : 1.0;
 
