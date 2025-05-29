@@ -13,6 +13,7 @@
 #include <memory>
 
 #include <mpi.h>
+#include "config.hh"
 
 namespace
 {
@@ -172,46 +173,46 @@ void SWESolver::init_from_HDF5_file(const std::string &h5_file){
   this->hu1_.resize(this->hu0_.size(), 0.0);
   this->hv1_.resize(this->hv0_.size(), 0.0);
 
-  this->init_dx_dy();
+  // this->init_dx_dy();
 }
 
-void SWESolver::init_gaussian(){
-  hu0_.resize(nx_ * ny_, 0.0);
-  hv0_.resize(nx_ * ny_, 0.0);
-  std::fill(hu0_.begin(), hu0_.end(), 0.0);
-  std::fill(hv0_.begin(), hv0_.end(), 0.0);
+// void SWESolver::init_gaussian(){
+//   hu0_.resize(nx_ * ny_, 0.0);
+//   hv0_.resize(nx_ * ny_, 0.0);
+//   std::fill(hu0_.begin(), hu0_.end(), 0.0);
+//   std::fill(hv0_.begin(), hv0_.end(), 0.0);
 
-  h0_.clear();
-  h0_.reserve(nx_ * ny_);
+//   h0_.clear();
+//   h0_.reserve(nx_ * ny_);
 
-  h1_.resize(nx_ * ny_);
-  hu1_.resize(nx_ * ny_);
-  hv1_.resize(nx_ * ny_);
+//   h1_.resize(nx_ * ny_);
+//   hu1_.resize(nx_ * ny_);
+//   hv1_.resize(nx_ * ny_);
 
-  const double x0_0 = size_x_ / 4.0;
-  const double y0_0 = size_y_ / 3.0;
-  const double x0_1 = size_x_ / 2.0;
-  const double y0_1 = 0.75 * size_y_;
+//   const double x0_0 = size_x_ / 4.0;
+//   const double y0_0 = size_y_ / 3.0;
+//   const double x0_1 = size_x_ / 2.0;
+//   const double y0_1 = 0.75 * size_y_;
 
-  const double dx = size_x_ / nx_;
-  const double dy = size_y_ / ny_;
+//   const double dx = size_x_ / nx_;
+//   const double dy = size_y_ / ny_;
 
-  for (std::size_t j = 0; j < ny_; ++j){
-    for (std::size_t i = 0; i < nx_; ++i){
-      const double x = dx * (static_cast<double>(i) + 0.5);
-      const double y = dy * (static_cast<double>(j) + 0.5);
-      const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
-      const double gauss_1 = 10.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 1000.0);
+//   for (std::size_t j = 0; j < ny_; ++j){
+//     for (std::size_t i = 0; i < nx_; ++i){
+//       const double x = dx * (static_cast<double>(i) + 0.5);
+//       const double y = dy * (static_cast<double>(j) + 0.5);
+//       const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
+//       const double gauss_1 = 10.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 1000.0);
 
-      h0_.push_back(10.0 + gauss_0 + gauss_1);
-    }
-  }
+//       h0_.push_back(10.0 + gauss_0 + gauss_1);
+//     }
+//   }
 
-  z_.resize(this->h0_.size());
-  std::fill(z_.begin(), z_.end(), 0.0);
+//   z_.resize(this->h0_.size());
+//   std::fill(z_.begin(), z_.end(), 0.0);
 
-  this->init_dx_dy();
-}
+//   this->init_dx_dy();
+// }
 
 void SWESolver::exchange_halos(){
   MPI_Datatype column_dtype;
@@ -227,21 +228,21 @@ void SWESolver::exchange_halos(){
   MPI_Type_commit(&row_dtype);
 
   // Here we create an anonymous fuctions that we perform the exchanging on all the variables.
-  auto __exchange_halos = [&](std::vector<double> &vec){
-      MPI_Sendrecv(&at(z_, 1, 1, local_nx), 1, column_dtype, neighbor_west, 0,
-                   &at(z_, local_nx+1, 1, local_nx), 1, column_dtype, neighbor_east, 0,
+  auto __exchange_halos = [&](std::vector<double> &var){
+      MPI_Sendrecv(&at(var, 1, 1), 1, column_dtype, neighbor_west, 0,
+                   &at(var, local_nx+1, 1), 1, column_dtype, neighbor_east, 0,
                    cart_comm, MPI_STATUS_IGNORE);
 
-      MPI_Sendrecv(&at(z_, local_nx, 1, local_nx), 1, column_dtype, neighbor_east, 1,
-                   &at(z_, 0, 1, local_nx), 1, column_dtype, neighbor_west, 1,
+      MPI_Sendrecv(&at(var, local_nx, 1), 1, column_dtype, neighbor_east, 1,
+                   &at(var, 0, 1), 1, column_dtype, neighbor_west, 1,
                    cart_comm, MPI_STATUS_IGNORE);
 
-      MPI_Sendrecv(&at(z_, 1, 1, local_nx), 1, row_dtype, neighbor_south, 2,
-                   &at(z_, 1, local_ny+1, local_nx), 1, row_dtype, neighbor_north, 2,
+      MPI_Sendrecv(&at(var, 1, 1), 1, row_dtype, neighbor_south, 2,
+                   &at(var, 1, local_ny+1), 1, row_dtype, neighbor_north, 2,
                    cart_comm, MPI_STATUS_IGNORE);  
 
-      MPI_Sendrecv(&at(z_, 1, local_ny, local_nx),  1, row_dtype, neighbor_north, 3, // send your top real row
-                   &at(z_, 1, 0, local_nx),          1, row_dtype, neighbor_south, 3, // recv into your bottom ghost
+      MPI_Sendrecv(&at(var, 1, local_ny),  1, row_dtype, neighbor_north, 3, // send your top real row
+                   &at(var, 1, 0),          1, row_dtype, neighbor_south, 3, // recv into your bottom ghost
                    cart_comm, MPI_STATUS_IGNORE);
   };
 
@@ -260,10 +261,16 @@ void SWESolver::local_init_dx_dy(){
   double dx = size_x_/nx_;
   double dy = size_y_/ny_;
 
+  // Only loop interior cells — ghosts are at 0 and local_n+1
+  for(int j = 1; j <= (int) local_ny; ++j) {
+    for(int i = 1; i <= (int) local_nx; ++i) {
+      // central-difference in x
+      at(zdx_, i, j) = ( at(z_, i+1, j) - at(z_, i-1, j) ) / (2.0*dx);
 
-
-
-
+      // central-difference in y
+      at(zdy_, i, j) = ( at(z_, i, j+1) - at(z_, i, j-1) ) / (2.0*dy);
+    }
+  }
 }
 
 
@@ -285,60 +292,65 @@ void SWESolver::local_init_gaussian(){
 
       const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
       const double gauss_1 = 10.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 1000.0);
-      z_[j * (local_nx + 2) + i] = 0.0;
-      h0_[j * (local_nx + 2) + i] = 10.0 + gauss_0 + gauss_1;
-      hu0_[j * (local_nx + 2) + i] = 0.0;
-      hv0_[j * (local_nx + 2) + i] = 0.0;
+
+      // at(z_, i, j) = 0.0;
+      at(h0_, i, j) = 10.0 + gauss_0 + gauss_1;
+      // at(hu0_, i, j) = 0.0;
+      // at(hv0_, i, j) = 0.0;
     }
   }
+
+  // Here we exchange halos and then compute the inital derivatives
+  this->exchange_halos();
+  this->local_init_dx_dy();
 }
 
 
 
-void SWESolver::init_dummy_tsunami(){
-  hu0_.resize(nx_ * ny_);
-  hv0_.resize(nx_ * ny_);
-  std::fill(hu0_.begin(), hu0_.end(), 0.0);
-  std::fill(hv0_.begin(), hv0_.end(), 0.0);
+// void SWESolver::init_dummy_tsunami(){
+//   hu0_.resize(nx_ * ny_);
+//   hv0_.resize(nx_ * ny_);
+//   std::fill(hu0_.begin(), hu0_.end(), 0.0);
+//   std::fill(hv0_.begin(), hv0_.end(), 0.0);
 
-  h1_.resize(nx_ * ny_);
-  hu1_.resize(nx_ * ny_);
-  hv1_.resize(nx_ * ny_);
-  std::fill(h1_.begin(), h1_.end(), 0.0);
-  std::fill(hu1_.begin(), hu1_.end(), 0.0);
-  std::fill(hv1_.begin(), hv1_.end(), 0.0);
+//   h1_.resize(nx_ * ny_);
+//   hu1_.resize(nx_ * ny_);
+//   hv1_.resize(nx_ * ny_);
+//   std::fill(h1_.begin(), h1_.end(), 0.0);
+//   std::fill(hu1_.begin(), hu1_.end(), 0.0);
+//   std::fill(hv1_.begin(), hv1_.end(), 0.0);
 
-  const double x0_0 = 0.6 * size_x_;
-  const double y0_0 = 0.6 * size_y_;
-  const double x0_1 = 0.4 * size_x_;
-  const double y0_1 = 0.4 * size_y_;
-  const double x0_2 = 0.7 * size_x_;
-  const double y0_2 = 0.3 * size_y_;
+//   const double x0_0 = 0.6 * size_x_;
+//   const double y0_0 = 0.6 * size_y_;
+//   const double x0_1 = 0.4 * size_x_;
+//   const double y0_1 = 0.4 * size_y_;
+//   const double x0_2 = 0.7 * size_x_;
+//   const double y0_2 = 0.3 * size_y_;
 
-  const double dx = size_x_ / nx_;
-  const double dy = size_y_ / ny_;
+//   const double dx = size_x_ / nx_;
+//   const double dy = size_y_ / ny_;
 
-  // Creating topography and initial water height
-  z_.resize(nx_ * ny_);
-  h0_.resize(nx_ * ny_);
-  for (std::size_t j = 0; j < ny_; ++j){
-    for (std::size_t i = 0; i < nx_; ++i){
-      const double x = dx * (static_cast<double>(i) + 0.5);
-      const double y = dy * (static_cast<double>(j) + 0.5);
+//   // Creating topography and initial water height
+//   z_.resize(nx_ * ny_);
+//   h0_.resize(nx_ * ny_);
+//   for (std::size_t j = 0; j < ny_; ++j){
+//     for (std::size_t i = 0; i < nx_; ++i){
+//       const double x = dx * (static_cast<double>(i) + 0.5);
+//       const double y = dy * (static_cast<double>(j) + 0.5);
 
-      const double gauss_0 = 2.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 3000.0);
-      const double gauss_1 = 3.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 10000.0);
-      const double gauss_2 = 5.0 * std::exp(-((x - x0_2) * (x - x0_2) + (y - y0_2) * (y - y0_2)) / 100.0);
+//       const double gauss_0 = 2.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 3000.0);
+//       const double gauss_1 = 3.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 10000.0);
+//       const double gauss_2 = 5.0 * std::exp(-((x - x0_2) * (x - x0_2) + (y - y0_2) * (y - y0_2)) / 100.0);
 
-      const double z = -1.0 + gauss_0 + gauss_1;
-      at(z_, i, j) = z;
+//       const double z = -1.0 + gauss_0 + gauss_1;
+//       at(z_, i, j) = z;
 
-      double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
-      at(h0_, i, j) = h0;
-    }
-  }
-  this->init_dx_dy();
-}
+//       double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
+//       at(h0_, i, j) = h0;
+//     }
+//   }
+//   this->init_dx_dy();
+// }
 
 
 void SWESolver::local_init_dummy_tsunami(){
@@ -353,8 +365,8 @@ void SWESolver::local_init_dummy_tsunami(){
   const double dx = size_x_ / nx_;
   const double dy = size_y_ / ny_;
 
-  for(int j = 0; j < local_ny + 2; j++){
-    for(int i = 0; i < local_nx + 2; i++){
+  for(size_t j = 0; j < local_ny + 2; j++){
+    for(size_t i = 0; i < local_nx + 2; i++){
       int gi = offset_x + i - 1;
       int gj = offset_y + j - 1;
       const double x = dx * (static_cast<double>(gi) + 0.5);
@@ -365,195 +377,228 @@ void SWESolver::local_init_dummy_tsunami(){
       const double gauss_2 = 5.0 * std::exp(-((x - x0_2) * (x - x0_2) + (y - y0_2) * (y - y0_2)) / 100.0);
       const double z = -1.0 + gauss_0 + gauss_1;
 
-      z_[j*(local_nx + 2) + i] = z;
-
-      double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
-      h0_[j*(local_nx + 2) + i] = h0;
-      hu0_[j*(local_nx + 2) + i] = 0.0;
-      hv0_[j*(local_nx + 2) + i] = 0.0;
-      h1_[j*(local_nx + 2) + i] = 0.0;
-      hu1_[j*(local_nx + 2) + i] = 0.0;
-      hv1_[j*(local_nx + 2) + i] = 0.0;
-    }
-  }
-}
-
-
-void SWESolver::init_dummy_slope(){
-  hu0_.resize(nx_ * ny_);
-  hv0_.resize(nx_ * ny_);
-  std::fill(hu0_.begin(), hu0_.end(), 0.0);
-  std::fill(hv0_.begin(), hv0_.end(), 0.0);
-
-  h1_.resize(nx_ * ny_);
-  hu1_.resize(nx_ * ny_);
-  hv1_.resize(nx_ * ny_);
-  std::fill(h1_.begin(), h1_.end(), 0.0);
-  std::fill(hu1_.begin(), hu1_.end(), 0.0);
-  std::fill(hv1_.begin(), hv1_.end(), 0.0);
-
-  const double dx = size_x_ / nx_;
-  const double dy = size_y_ / ny_;
-
-  const double dz = 10.0;
-
-  // Creating topography and initial water height
-  z_.resize(nx_ * ny_);
-  h0_.resize(nx_ * ny_);
-  for (std::size_t j = 0; j < ny_; ++j){
-    for (std::size_t i = 0; i < nx_; ++i){
-      const double x = dx * (static_cast<double>(i) + 0.5);
-      const double y = dy * (static_cast<double>(j) + 0.5);
-      static_cast<void>(y);
-
-      const double z = -10.0 - 0.5 * dz + dz / size_x_ * x;
       at(z_, i, j) = z;
 
-      double h0 = z < 0.0 ? -z : 0.00001;
+      double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
       at(h0_, i, j) = h0;
+      // at(hu0_, i, j) = 0.0;
+      // at(hv0_, i, j) = 0.0;
+      // at(h1_, i, j) = 0.0;
+      // at(hu1_, i, j) = 0.0;
+      // at(hv1_, i, j) = 0.0;  
     }
   }
-  this->init_dx_dy();
+
+  // Here we share the halos and then compute the initial derivatives.
+  this->exchange_halos();
+  this->local_init_dx_dy();
 }
 
-void SWESolver::init_dx_dy(){
-  zdx_.resize(this->z_.size(), 0.0);
-  zdy_.resize(this->z_.size(), 0.0);
 
-  const double dx = size_x_ / nx_;
-  const double dy = size_y_ / ny_;
-  for (std::size_t j = 1; j < ny_ - 1; ++j){
-    for (std::size_t i = 1; i < nx_ - 1; ++i){
-      at(this->zdx_, i, j) = 0.5 * (at(this->z_, i + 1, j) - at(this->z_, i - 1, j)) / dx;
-      at(this->zdy_, i, j) = 0.5 * (at(this->z_, i, j + 1) - at(this->z_, i, j - 1)) / dy;
-    }
-  }
-}
+// void SWESolver::init_dummy_slope(){
+//   hu0_.resize(nx_ * ny_);
+//   hv0_.resize(nx_ * ny_);
+//   std::fill(hu0_.begin(), hu0_.end(), 0.0);
+//   std::fill(hv0_.begin(), hv0_.end(), 0.0);
+
+//   h1_.resize(nx_ * ny_);
+//   hu1_.resize(nx_ * ny_);
+//   hv1_.resize(nx_ * ny_);
+//   std::fill(h1_.begin(), h1_.end(), 0.0);
+//   std::fill(hu1_.begin(), hu1_.end(), 0.0);
+//   std::fill(hv1_.begin(), hv1_.end(), 0.0);
+
+//   const double dx = size_x_ / nx_;
+//   const double dy = size_y_ / ny_;
+
+//   const double dz = 10.0;
+
+//   // Creating topography and initial water height
+//   z_.resize(nx_ * ny_);
+//   h0_.resize(nx_ * ny_);
+//   for (std::size_t j = 0; j < ny_; ++j){
+//     for (std::size_t i = 0; i < nx_; ++i){
+//       const double x = dx * (static_cast<double>(i) + 0.5);
+//       const double y = dy * (static_cast<double>(j) + 0.5);
+//       static_cast<void>(y);
+
+//       const double z = -10.0 - 0.5 * dz + dz / size_x_ * x;
+//       at(z_, i, j) = z;
+
+//       double h0 = z < 0.0 ? -z : 0.00001;
+//       at(h0_, i, j) = h0;
+//     }
+//   }
+//   this->init_dx_dy();
+// }
+
+// void SWESolver::init_dx_dy(){
+//   zdx_.resize(this->z_.size(), 0.0);
+//   zdy_.resize(this->z_.size(), 0.0);
+
+//   const double dx = size_x_ / nx_;
+//   const double dy = size_y_ / ny_;
+//   for (std::size_t j = 1; j < ny_ - 1; ++j){
+//     for (std::size_t i = 1; i < nx_ - 1; ++i){
+//       at(this->zdx_, i, j) = 0.5 * (at(this->z_, i + 1, j) - at(this->z_, i - 1, j)) / dx;
+//       at(this->zdy_, i, j) = 0.5 * (at(this->z_, i, j + 1) - at(this->z_, i, j - 1)) / dy;
+//     }
+//   }
+// }
 
 void SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix){
   std::shared_ptr<XDMFWriter> writer;
-  if (output_n > 0)
-  {
+  if (output_n > 0){
     writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
     writer->add_h(h0_, 0.0);
   }
 
   double T = 0.0;
 
-  std::vector<double> &h = h1_;
-  std::vector<double> &hu = hu1_;
-  std::vector<double> &hv = hv1_;
+  // std::vector<double> &h = h1_;
+  // std::vector<double> &hu = hu1_;
+  // std::vector<double> &hv = hv1_;
 
-  std::vector<double> &h0 = h0_;
-  std::vector<double> &hu0 = hu0_;
-  std::vector<double> &hv0 = hv0_;
-
-  std::cout << "Solving SWE..." << std::endl;
+  // std::vector<double> &h0 = h0_;
+  // std::vector<double> &hu0 = hu0_;
+  // std::vector<double> &hv0 = hv0_;
+  #if DEBUG
+    if(rank == 0){
+      std::cout << "Solving SWE..." << std::endl;
+    }
+  #endif
 
   std::size_t nt = 1;
   while (T < Tend){
-    const double dt = this->compute_time_step(h0, hu0, hv0, T, Tend);
+    const double dt = this->local_compute_timestep(T, Tend);
 
     const double T1 = T + dt;
 
     #if DEBUG
-      printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
-      std::cout << (full_log ? "\n" : "\r") << std::flush;
+      if(rank == 0){
+        printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
+        std::cout << (full_log ? "\n" : "\r") << std::flush;
+      }
     #endif
+    this->exchange_halos();
+    this->solve_step(dt);
+    this->update_bcs();
 
-    this->update_bcs(h0, hu0, hv0, h, hu, hv);
 
-    this->solve_step(dt, h0, hu0, hv0, h, hu, hv);
-
-    if (output_n > 0 && nt % output_n == 0)
+    if (output_n > 0 && nt % output_n == 0 && rank == 0)
     {
-      writer->add_h(h, T1);
+      writer->add_h(h1_, T1);
     }
     ++nt;
 
     // Swap the old and new solutions
-    std::swap(h, h0);
-    std::swap(hu, hu0);
-    std::swap(hv, hv0);
+    std::swap(h1_, h0_);
+    std::swap(hu1_, hu0_);
+    std::swap(hv1_, hv0_);
 
     T = T1;
   }
 
   // Copying last computed values to h1_, hu1_, hv1_ (if needed)
-  if (&h0 != &h1_){
-    h1_ = h0;
-    hu1_ = hu0;
-    hv1_ = hv0;
+  if (&h0_ != &h1_){
+    h1_ = h0_;
+    hu1_ = hu0_;
+    hv1_ = hv0_;
   }
 
-  if (output_n > 0){
+  if (output_n > 0 && rank == 0){
     writer->add_h(h1_, T);
   }
-
-  std::cout << "Finished solving SWE." << std::endl;
+  if(rank == 0){
+    std::cout << "Finished solving SWE." << std::endl;
+  }
 }
 
-double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const{
+// double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const{
+//   double max_nu_sqr = 0.0;
+//   double au{0.0};
+//   double av{0.0};
+//   for (std::size_t j = 1; j < ny_ - 1; ++j)
+//   {
+//     for (std::size_t i = 1; i < nx_ - 1; ++i)
+//     {
+//       au = std::max(au, std::fabs(at(hu, i, j)));
+//       av = std::max(av, std::fabs(at(hv, i, j)));
+//       const double nu_u = std::fabs(at(hu, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
+//       const double nu_v = std::fabs(at(hv, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
+//       max_nu_sqr = std::max(max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
+//     }
+//   }
+
+//   const double dx = size_x_ / nx_;
+//   const double dy = size_y_ / ny_;
+//   double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu_sqr));
+//   return std::min(dt, Tend - T);
+// }
+
+
+double SWESolver::local_compute_timestep(const double T, const double Tend){
+  double local_max_nu_sqr = 0.0;
   double max_nu_sqr = 0.0;
-  double au{0.0};
-  double av{0.0};
-  for (std::size_t j = 1; j < ny_ - 1; ++j)
-  {
-    for (std::size_t i = 1; i < nx_ - 1; ++i)
-    {
-      au = std::max(au, std::fabs(at(hu, i, j)));
-      av = std::max(av, std::fabs(at(hv, i, j)));
-      const double nu_u = std::fabs(at(hu, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
-      const double nu_v = std::fabs(at(hv, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
-      max_nu_sqr = std::max(max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
+  
+  for (std::size_t j = 1; j < local_ny + 1; ++j){
+    for (std::size_t i = 1; i < local_nx + 1; ++i){
+      const double nu_u = std::fabs(at(hu1_, i, j)) / at(h1_, i, j) + sqrt(g * at(h1_, i, j));
+      const double nu_v = std::fabs(at(hv1_, i, j)) / at(h1_, i, j) + sqrt(g * at(h1_, i, j));
+      local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
     }
   }
 
   const double dx = size_x_ / nx_;
   const double dy = size_y_ / ny_;
+
+
+  MPI_Allreduce(&local_max_nu_sqr, &max_nu_sqr, 1, MPI_DOUBLE, MPI_MAX, cart_comm);
+
   double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu_sqr));
   return std::min(dt, Tend - T);
 }
 
-void SWESolver::compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
+void SWESolver::compute_kernel(const std::size_t i, const std::size_t j, const double dt){
   const double dx = size_x_ / nx_;
-  const double dy = size_x_ / ny_;
+  const double dy = size_y_ / ny_;
+
   const double C1x = 0.5 * dt / dx;
   const double C1y = 0.5 * dt / dy;
   const double C2 = dt * g;
   constexpr double C3 = 0.5 * g;
 
-  double hij = 0.25 * (at(h0, i, j - 1) + at(h0, i, j + 1) + at(h0, i - 1, j) + at(h0, i + 1, j))
-               + C1x * (at(hu0, i - 1, j) - at(hu0, i + 1, j)) + C1y * (at(hv0, i, j - 1) - at(hv0, i, j + 1));
+  double hij = 0.25 * (at(h0_, i, j - 1) + at(h0_, i, j + 1) + at(h0_, i - 1, j) + at(h0_, i + 1, j))
+               + C1x * (at(hu0_, i - 1, j) - at(hu0_, i + 1, j)) + C1y * (at(hv0_, i, j - 1) - at(hv0_, i, j + 1));
   
   if (hij < 0.0){
     hij = 1.0e-5;
   }
 
-  at(h, i, j) = hij;
+  at(h1_, i, j) = hij;
 
   if (hij > 0.0001){
-    at(hu, i, j) =
-      0.25 * (at(hu0, i, j - 1) + at(hu0, i, j + 1) + at(hu0, i - 1, j) + at(hu0, i + 1, j)) - C2 * hij * at(zdx_, i, j)
+    at(hu1_, i, j) =
+      0.25 * (at(hu0_, i, j - 1) + at(hu0_, i, j + 1) + at(hu0_, i - 1, j) + at(hu0_, i + 1, j)) - C2 * hij * at(zdx_, i, j)
       + C1x
-          * (at(hu0, i - 1, j) * at(hu0, i - 1, j) / at(h0, i - 1, j) + C3 * at(h0, i - 1, j) * at(h0, i - 1, j)
-             - at(hu0, i + 1, j) * at(hu0, i + 1, j) / at(h0, i + 1, j) - C3 * at(h0, i + 1, j) * at(h0, i + 1, j))
+          * (at(hu0_, i - 1, j) * at(hu0_, i - 1, j) / at(h0_, i - 1, j) + C3 * at(h0_, i - 1, j) * at(h0_, i - 1, j)
+             - at(hu0_, i + 1, j) * at(hu0_, i + 1, j) / at(h0_, i + 1, j) - C3 * at(h0_, i + 1, j) * at(h0_, i + 1, j))
       + C1y
-          * (at(hu0, i, j - 1) * at(hv0, i, j - 1) / at(h0, i, j - 1)
-             - at(hu0, i, j + 1) * at(hv0, i, j + 1) / at(h0, i, j + 1));
+          * (at(hu0_, i, j - 1) * at(hv0_, i, j - 1) / at(h0_, i, j - 1)
+             - at(hu0_, i, j + 1) * at(hv0_, i, j + 1) / at(h0_, i, j + 1));
 
-    at(hv, i, j) =
-      0.25 * (at(hv0, i, j - 1) + at(hv0, i, j + 1) + at(hv0, i - 1, j) + at(hv0, i + 1, j)) - C2 * hij * at(zdy_, i, j)
+    at(hv1_, i, j) =
+      0.25 * (at(hv0_, i, j - 1) + at(hv0_, i, j + 1) + at(hv0_, i - 1, j) + at(hv0_, i + 1, j)) - C2 * hij * at(zdy_, i, j)
       + C1x
-          * (at(hu0, i - 1, j) * at(hv0, i - 1, j) / at(h0, i - 1, j)
-             - at(hu0, i + 1, j) * at(hv0, i + 1, j) / at(h0, i + 1, j))
+          * (at(hu0_, i - 1, j) * at(hv0_, i - 1, j) / at(h0_, i - 1, j)
+             - at(hu0_, i + 1, j) * at(hv0_, i + 1, j) / at(h0_, i + 1, j))
       + C1y
-          * (at(hv0, i, j - 1) * at(hv0, i, j - 1) / at(h0, i, j - 1) + C3 * at(h0, i, j - 1) * at(h0, i, j - 1)
-             - at(hv0, i, j + 1) * at(hv0, i, j + 1) / at(h0, i, j + 1) - C3 * at(h0, i, j + 1) * at(h0, i, j + 1));
+          * (at(hv0_, i, j - 1) * at(hv0_, i, j - 1) / at(h0_, i, j - 1) + C3 * at(h0_, i, j - 1) * at(h0_, i, j - 1)
+             - at(hv0_, i, j + 1) * at(hv0_, i, j + 1) / at(h0_, i, j + 1) - C3 * at(h0_, i, j + 1) * at(h0_, i, j + 1));
   }
   else{
-    at(hu, i, j) = 0.0;
-    at(hv, i, j) = 0.0;
+    at(hu1_, i, j) = 0.0;
+    at(hv1_, i, j) = 0.0;
   }
 
   // h(2:nx-1,2:nx-1) = 0.25*(h0(2:nx-1,1:nx-2)+h0(2:nx-1,3:nx)+h0(1:nx-2,2:nx-1)+h0(3:nx,2:nx-1)) ...
@@ -574,38 +619,54 @@ void SWESolver::compute_kernel(const std::size_t i, const std::size_t j, const d
   //     hv0(3:nx,2:nx-1).^2./h0(3:nx,2:nx-1) - 0.5*g*h0(3:nx,2:nx-1).^2  );
 }
 
-void SWESolver::solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
-  for (std::size_t j = 1; j < ny_ - 1; ++j){
-    for (std::size_t i = 1; i < nx_ - 1; ++i){
-      this->compute_kernel(i, j, dt, h0, hu0, hv0, h, hu, hv);
+void SWESolver::solve_step(const double dt){
+  for (std::size_t j = 1; j < local_ny + 1; ++j){  
+    for (std::size_t i = 1; i < local_nx + 1; ++i){
+      this->compute_kernel(i, j, dt);
     }
   }
 }
 
-void SWESolver::update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
+void SWESolver::update_bcs(){
   const double coef = this->reflective_ ? -1.0 : 1.0;
 
-  // Top and bottom boundaries.
-  for (std::size_t i = 0; i < nx_; ++i){
-    at(h, i, 0) = at(h0, i, 1);
-    at(h, i, ny_ - 1) = at(h0, i, ny_ - 2);
+  //figure out which boundary I am. One of my neighbours will be MPI_PROC_NULL. If two of my neighbours are
+  //MPI_PROC_NULL, I am a corner.
 
-    at(hu, i, 0) = at(hu0, i, 1);
-    at(hu, i, ny_ - 1) = at(hu0, i, ny_ - 2);
+  if (neighbor_west == MPI_PROC_NULL){
+    // This is the west side boundary
 
-    at(hv, i, 0) = coef * at(hv0, i, 1);
-    at(hv, i, ny_ - 1) = coef * at(hv0, i, ny_ - 2);
+    for (std::size_t j = 1; j <= local_ny; ++j){
+      at(h1_, 0, j) = at(h0_, 1, j);
+      at(hu1_, 0, j) = coef * at(hu0_, 1, j);
+      at(hv1_, 0, j) = at(hv0_, 1, j);
+    }
   }
 
-  // Left and right boundaries.
-  for (std::size_t j = 0; j < ny_; ++j){
-    at(h, 0, j) = at(h0, 1, j);
-    at(h, nx_ - 1, j) = at(h0, nx_ - 2, j);
+  if (neighbor_east== MPI_PROC_NULL){
+    // This is the east side boundary
+    for (std::size_t j = 1; j <= local_ny; ++j){
+    at(h1_, local_nx, j) = at(h0_, local_nx - 1, j);
+    at(hu1_, local_nx, j) = coef * at(hu0_, local_nx - 1, j);
+    at(hv1_, local_nx, j) = at(hv0_, local_nx - 1, j);
+    }
+  }
 
-    at(hu, 0, j) = coef * at(hu0, 1, j);
-    at(hu, nx_ - 1, j) = coef * at(hu0, nx_ - 2, j);
+  if (neighbor_north == MPI_PROC_NULL){
+    // This is the north side boundary
+    for (std::size_t i = 1; i <= local_nx + 1; ++i){
+      at(h1_, i, 0) = at(h0_, i, 1);
+      at(hu1_, i, 0) = at(hu0_, i, 1);
+      at(hv1_, i, 0) = coef * at(hv0_, i, 1);
+    }
+  }
 
-    at(hv, 0, j) = at(hv0, 1, j);
-    at(hv, nx_ - 1, j) = at(hv0, nx_ - 2, j);
+  if (neighbor_south == MPI_PROC_NULL){
+    // This is the south side boundary
+    for (std::size_t i = 1; i <= local_nx; ++i){
+      at(h1_, i, local_ny) = at(h0_, i, local_ny - 1);
+      at(hu1_, i, local_ny) = at(hu0_, i, local_ny - 1);
+      at(hv1_, i, local_ny) = coef * at(hv0_, i, local_ny - 1);
+    }
   }
 };

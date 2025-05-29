@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=1
 #SBATCH --time=02:30:00
 #SBATCH --qos=math-454
@@ -8,4 +8,4 @@
 #SBATCH --output=/dev/null
 
 
-srun --output=./parallel_time.txt ./swe
+srun --output=./parallel_time.txt ./swe 1 1000 1000 0

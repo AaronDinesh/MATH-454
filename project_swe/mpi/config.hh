@@ -2,7 +2,7 @@
 #define __CONFIG_HH__
 
 
-#define DEBUG 0
+#define DEBUG 1
 
 
 #endif

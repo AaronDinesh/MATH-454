@@ -3,6 +3,7 @@
 #include <string>
 #include <mpi.h>
 
+
 class SWESolver
 {
 public:
@@ -125,10 +126,13 @@ private:
   bool reflective_;
   std::vector<double> h0_;
   std::vector<double> h1_;
+  // ########################## //
   std::vector<double> hu0_;
   std::vector<double> hu1_;
+  // ########################## //
   std::vector<double> hv0_;
   std::vector<double> hv1_;
+  // ########################## //
   std::vector<double> z_;
   std::vector<double> zdx_;
   std::vector<double> zdy_;
@@ -140,30 +144,30 @@ private:
   std::size_t local_nx, local_ny;
   std::size_t offset_x, offset_y;
 
-  /**
-   * @brief Accessor for 2D vector elements.
-   */
-  inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j) const
-  {
-    return vec[j * nx_ + i];
+  // /**
+  //  * @brief Accessor for 2D vector elements.
+  //  */
+  // inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j) const
+  // {
+  //   return vec[j * nx_ + i];
+  // }
+
+  inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j){
+    return vec[j * (local_nx+2) + i];
   }
 
-  inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j, const std::size_t stride) const{
-    return vec[j * stride + i];
-  }
+  // inline const double &at(const std::vector<double> &vec, const std::size_t i, const std::size_t j) const{
+  //   return vec[j * (local_nx+2) + i];
+  // }
 
-  inline const double &at(const std::vector<double> &vec, const std::size_t i, const std::size_t j, const std::size_t stride) const{
-    return vec[j * stride + i];
-  }
-
-  /**
-   * @brief Accessor for 2D vector elements.
-   * @note Constant vector version.
-   */
-  inline const double &at(const std::vector<double> &vec, const std::size_t i, const std::size_t j) const
-  {
-    return vec[j * nx_ + i];
-  }
+  // /**
+  //  * @brief Accessor for 2D vector elements.
+  //  * @note Constant vector version.
+  //  */
+  // inline const double &at(const std::vector<double> &vec, const std::size_t i, const std::size_t j) const
+  // {
+  //   return vec[j * nx_ + i];
+  // }
 
   /**
    * @brief Updates the water height and velocities using the SWE kernel at a given cell.
@@ -177,7 +181,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
+  void compute_kernel(const std::size_t i, const std::size_t j, const double dt);
 
   /**
    * @brief Computes the time step size that satisfied the CFL condition.
@@ -189,7 +193,11 @@ private:
    * @param Tend Final time.
    * @return Compute time step.
    */
-  double compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const;
+  double compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend);
+
+  
+  double local_compute_timestep(const double T, const double Tend);
+
 
   /**
    * @brief Solve one step of the SWE.
@@ -201,7 +209,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
+  void solve_step(const double dt);
 
   /**
    * @brief Update boundary conditions.
@@ -213,5 +221,8 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
+  void update_bcs();
+
+  void local_update_bcs();
+
 };
