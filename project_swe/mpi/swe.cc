@@ -481,8 +481,10 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
       }
     #endif
     this->exchange_halos();
-    this->solve_step(dt);
+    
     this->update_bcs();
+    
+    this->solve_step(dt);
 
 
     if (output_n > 0 && nt % output_n == 0 && rank == 0)
@@ -543,8 +545,8 @@ double SWESolver::local_compute_timestep(const double T, const double Tend){
   
   for (std::size_t j = 1; j < local_ny + 1; ++j){
     for (std::size_t i = 1; i < local_nx + 1; ++i){
-      const double nu_u = std::fabs(at(hu1_, i, j)) / at(h1_, i, j) + sqrt(g * at(h1_, i, j));
-      const double nu_v = std::fabs(at(hv1_, i, j)) / at(h1_, i, j) + sqrt(g * at(h1_, i, j));
+      const double nu_u = std::fabs(at(hu0_, i, j)) / at(h0_, i, j) + sqrt(g * at(h0_, i, j));
+      const double nu_v = std::fabs(at(hv0_, i, j)) / at(h0_, i, j) + sqrt(g * at(h0_, i, j));
       local_max_nu_sqr = std::max(local_max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
     }
   }
@@ -646,27 +648,27 @@ void SWESolver::update_bcs(){
   if (neighbor_east== MPI_PROC_NULL){
     // This is the east side boundary
     for (std::size_t j = 1; j <= local_ny; ++j){
-    at(h1_, local_nx, j) = at(h0_, local_nx - 1, j);
-    at(hu1_, local_nx, j) = coef * at(hu0_, local_nx - 1, j);
-    at(hv1_, local_nx, j) = at(hv0_, local_nx - 1, j);
+    at(h1_, local_nx+1, j) = at(h0_, local_nx, j);
+    at(hu1_, local_nx+1, j) = coef * at(hu0_, local_nx, j);
+    at(hv1_, local_nx+1, j) = at(hv0_, local_nx, j);
     }
   }
 
-  if (neighbor_north == MPI_PROC_NULL){
+  if (neighbor_south == MPI_PROC_NULL){
     // This is the north side boundary
-    for (std::size_t i = 1; i <= local_nx + 1; ++i){
+    for (std::size_t i = 1; i <= local_nx; ++i){
       at(h1_, i, 0) = at(h0_, i, 1);
       at(hu1_, i, 0) = at(hu0_, i, 1);
       at(hv1_, i, 0) = coef * at(hv0_, i, 1);
     }
   }
 
-  if (neighbor_south == MPI_PROC_NULL){
+  if (neighbor_north == MPI_PROC_NULL){
     // This is the south side boundary
     for (std::size_t i = 1; i <= local_nx; ++i){
-      at(h1_, i, local_ny) = at(h0_, i, local_ny - 1);
-      at(hu1_, i, local_ny) = at(hu0_, i, local_ny - 1);
-      at(hv1_, i, local_ny) = coef * at(hv0_, i, local_ny - 1);
+      at(h1_, i, local_ny + 1) = at(h0_, i, local_ny);
+      at(hu1_, i, local_ny + 1) = at(hu0_, i, local_ny);
+      at(hv1_, i, local_ny + 1) = coef * at(hv0_, i, local_ny);
     }
   }
 };
