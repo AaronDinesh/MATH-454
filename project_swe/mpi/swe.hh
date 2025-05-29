@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <vector>
 #include <string>
+#include <mpi.h>
 
 class SWESolver
 {
@@ -20,7 +21,7 @@ public:
    * @param nx  Number of cells along the x direction.
    * @param ny  Number of cells along the y direction.
    */
-  SWESolver(const int test_case_id, const std::size_t nx, const std::size_t ny);
+  SWESolver(const int test_case_id, const std::size_t nx, const std::size_t ny, MPI_Comm comm);
 
   /**
    * @brief Constructor for the SWESolver class.
@@ -68,12 +69,31 @@ private:
    * The initial water velocity is set to zero and the topography is set to zero.
    */
   void init_gaussian();
+  
+  /**
+   * @brief Initializes the initial conditions and topography using
+   * a Gaussian function. Only computes the local values needed. Must be used with cartesian communicator
+   *
+   * The water height is initialized with two separated Gaussian peaks.
+   * The initial water velocity is set to zero and the topography is set to zero.
+   */
+  void local_init_gaussian();
+
 
   /**
    * @brief Initializes the initial conditions and topography using
    * a dummy tsunami function.
    */
   void init_dummy_tsunami();
+  
+  /**
+   * @brief Initializes the initial conditions and topography using
+   * a dummy tsunami function. Only computes the local values needed. Must be used with cartesian communicator
+   */
+  void local_init_dummy_tsunami();
+
+
+
 
   /**
    * @brief Initializes the initial conditions and topography using
@@ -85,6 +105,18 @@ private:
    * @brief Initializes the derivatives dx and dy from the topography.
    */
   void init_dx_dy();
+  
+  /**
+   * @brief Initializes the derivatives dx and dy from the topography. Must use with cartesian communicator
+   */
+  void local_init_dx_dy();
+
+  /**
+   * @brief Excahnge ghost cells when computing the derivatives
+   */
+  void exchange_halos();
+
+
 
   std::size_t nx_;
   std::size_t ny_;
@@ -100,6 +132,13 @@ private:
   std::vector<double> z_;
   std::vector<double> zdx_;
   std::vector<double> zdy_;
+  int rank;
+  int size;
+  MPI_Comm cart_comm;
+  int dims[2], coords[2];
+  int neighbor_west, neighbor_east, neighbor_north, neighbor_south;
+  std::size_t local_nx, local_ny;
+  std::size_t offset_x, offset_y;
 
   /**
    * @brief Accessor for 2D vector elements.
@@ -107,6 +146,14 @@ private:
   inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j) const
   {
     return vec[j * nx_ + i];
+  }
+
+  inline double &at(std::vector<double> &vec, const std::size_t i, const std::size_t j, const std::size_t stride) const{
+    return vec[j * stride + i];
+  }
+
+  inline const double &at(const std::vector<double> &vec, const std::size_t i, const std::size_t j, const std::size_t stride) const{
+    return vec[j * stride + i];
   }
 
   /**
@@ -130,15 +177,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void compute_kernel(const std::size_t i,
-                      const std::size_t j,
-                      const double dt,
-                      const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const;
+  void compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
 
   /**
    * @brief Computes the time step size that satisfied the CFL condition.
@@ -150,11 +189,7 @@ private:
    * @param Tend Final time.
    * @return Compute time step.
    */
-  double compute_time_step(const std::vector<double> &h,
-                           const std::vector<double> &hu,
-                           const std::vector<double> &hv,
-                           const double T,
-                           const double Tend) const;
+  double compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const;
 
   /**
    * @brief Solve one step of the SWE.
@@ -166,13 +201,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void solve_step(const double dt,
-                  const std::vector<double> &h0,
-                  const std::vector<double> &hu0,
-                  const std::vector<double> &hv0,
-                  std::vector<double> &h,
-                  std::vector<double> &hu,
-                  std::vector<double> &hv) const;
+  void solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
 
   /**
    * @brief Update boundary conditions.
@@ -184,10 +213,5 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void update_bcs(const std::vector<double> &h0,
-                  const std::vector<double> &hu0,
-                  const std::vector<double> &hv0,
-                  std::vector<double> &h,
-                  std::vector<double> &hu,
-                  std::vector<double> &hv) const;
+  void update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
 };

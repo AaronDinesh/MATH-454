@@ -1,45 +1,35 @@
-// TIME TO BEAT 109 s
-
-
 #include "swe.hh"
-#include <mpi.h>
 #include <string>
-#include <iostream>
 #include <cstddef>
+#include <iostream>
 #include <chrono>
+#include <mpi.h>
 
-int main(){
-  MPI_Init(NULL, NULL);
-
-
-  // Uncomment the option you want to run.
-
+int main(int argc, char* argv[]){
   // Option 1 - Solving simple problem: water drops in a box
-  const int test_case_id = 1;  // Water drops in a box
-  const double Tend = 1.0;     // Simulation time in hours
-  const std::size_t nx = 1000; // Number of cells per direction.
-  const std::size_t ny = 1000; // Number of cells per direction.
-  const std::size_t output_n = 10;
+  const int test_case_id = std::stoi(argv[1]);
+  const double Tend = 1.0;
+  const std::size_t nx = std::stoi(argv[2]);
+  const std::size_t ny = std::stoi(argv[3]);
+  const std::size_t output_n = std::stoi(argv[4]);
   const std::string output_fname = "water_drops";
   const bool full_log = false;
 
-  int rank, size;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Init(&argc, &argv);
 
-  SWESolver solver(test_case_id, nx, ny);
+
+  SWESolver solver(test_case_id, nx, ny, MPI_COMM_WORLD);
 
   auto start = std::chrono::high_resolution_clock::now();
-  
-  solver.solve(Tend, full_log, output_n, output_fname);
-  
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 
-  if (rank == 0){
-    std::cout << "Time taken by function: "
-              << duration.count() << " seconds" << std::endl;
-  }
+  solver.solve(Tend, full_log, output_n, output_fname);
+
+
+  auto end = std::chrono::high_resolution_clock::now();
+
+  auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+  std::cout << "Time taken: " << duration.count() << " s" << std::endl;
+
   // // Option 2 - Solving analytical (dummy) tsunami example.
   // const int test_case_id = 2;  // Analytical tsunami test case
   // const double Tend = 1.0;     // Simulation time in hours
@@ -69,6 +59,5 @@ int main(){
   // SWESolver solver(fname, size, size);
   // solver.solve(Tend, full_log, output_n, output_fname);
 
-  MPI_Finalize();
   return 0;
 }
