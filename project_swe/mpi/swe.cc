@@ -293,10 +293,10 @@ void SWESolver::local_init_gaussian(){
       const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
       const double gauss_1 = 10.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 1000.0);
 
-      // at(z_, i, j) = 0.0;
+      at(z_, i, j) = 0.0;
       at(h0_, i, j) = 10.0 + gauss_0 + gauss_1;
-      // at(hu0_, i, j) = 0.0;
-      // at(hv0_, i, j) = 0.0;
+      at(hu0_, i, j) = 0.0;
+      at(hv0_, i, j) = 0.0;
     }
   }
 
@@ -381,11 +381,11 @@ void SWESolver::local_init_dummy_tsunami(){
 
       double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
       at(h0_, i, j) = h0;
-      // at(hu0_, i, j) = 0.0;
-      // at(hv0_, i, j) = 0.0;
-      // at(h1_, i, j) = 0.0;
-      // at(hu1_, i, j) = 0.0;
-      // at(hv1_, i, j) = 0.0;  
+      at(hu0_, i, j) = 0.0;
+      at(hv0_, i, j) = 0.0;
+      at(h1_, i, j) = 0.0;
+      at(hu1_, i, j) = 0.0;
+      at(hv1_, i, j) = 0.0;  
     }
   }
 

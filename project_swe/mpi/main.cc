@@ -16,19 +16,26 @@ int main(int argc, char* argv[]){
   const bool full_log = false;
 
   MPI_Init(&argc, &argv);
+  int rank, size;
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
 
   SWESolver solver(test_case_id, nx, ny, MPI_COMM_WORLD);
-
-  auto start = std::chrono::high_resolution_clock::now();
+  if (rank == 0){
+    auto start = std::chrono::high_resolution_clock::now();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 
   solver.solve(Tend, full_log, output_n, output_fname);
 
-
-  auto end = std::chrono::high_resolution_clock::now();
-
-  auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-  std::cout << "Time taken: " << duration.count() << " s" << std::endl;
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank == 0){  
+    auto end = std::chrono::high_resolution_clock::now();
+    
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    std::cout << "Time taken: " << duration.count() << " s" << std::endl;
+  }
 
   // // Option 2 - Solving analytical (dummy) tsunami example.
   // const int test_case_id = 2;  // Analytical tsunami test case
@@ -58,6 +65,6 @@ int main(int argc, char* argv[]){
 
   // SWESolver solver(fname, size, size);
   // solver.solve(Tend, full_log, output_n, output_fname);
-
+  MPI_Finalize();
   return 0;
 }
