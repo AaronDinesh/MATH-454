@@ -80,6 +80,11 @@ private:
    */
   void local_init_gaussian();
 
+  /**
+   * @brief Gathers the data from each rank back to rank 0 and writes it to file
+   */
+
+  std::vector<double> gather_data(const MPI_Comm cart_comm, int rank, int size, std::size_t nx_, std::size_t ny_, std::size_t local_nx, std::size_t local_ny, const std::vector<double> &h0_);
 
   /**
    * @brief Initializes the initial conditions and topography using

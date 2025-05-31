@@ -450,7 +450,11 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
   std::shared_ptr<XDMFWriter> writer;
   if (output_n > 0){
     writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
-    writer->add_h(h0_, 0.0);
+    std::vector<double> mat = gather_data(this->cart_comm, this->rank, this->size, this->nx_, this->ny_, this->local_nx, this->local_ny, this->h0_);
+    
+    if(rank == 0){
+      writer->add_h(mat, 0.0);
+    }
   }
 
   double T = 0.0;
@@ -487,9 +491,11 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
     this->solve_step(dt);
 
 
-    if (output_n > 0 && nt % output_n == 0 && rank == 0)
-    {
-      writer->add_h(h1_, T1);
+    if (output_n > 0 && nt % output_n == 0 ){
+      std::vector<double> mat = gather_data(this->cart_comm, this->rank, this->size, this->nx_, this->ny_, this->local_nx, this->local_ny, this->h1_);
+      if (rank == 0){
+        writer->add_h(mat, T1);
+      }
     }
     ++nt;
 
@@ -508,8 +514,11 @@ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t 
     hv1_ = hv0_;
   }
 
-  if (output_n > 0 && rank == 0){
-    writer->add_h(h1_, T);
+  if (output_n > 0){
+    std::vector<double> mat = gather_data(this->cart_comm, this->rank, this->size, this->nx_, this->ny_, this->local_nx, this->local_ny, this->h1_);
+    if (rank == 0){
+      writer->add_h(mat, T);
+    }
   }
   if(rank == 0){
     std::cout << "Finished solving SWE." << std::endl;
@@ -628,6 +637,60 @@ void SWESolver::solve_step(const double dt){
     }
   }
 }
+
+
+std::vector<double> SWESolver::gather_data(const MPI_Comm cart_comm, int rank, int size, std::size_t nx_, std::size_t ny_, std::size_t local_nx, std::size_t local_ny, const std::vector<double> &h0_){
+  std::vector<double> send_buffer(local_nx*local_ny);
+
+  for (std::size_t j = 0; j < local_ny; ++j){
+    for (std::size_t i = 0; i < local_nx; ++i){
+      send_buffer[j * local_nx + i] = h0_[((j + 1) * (local_nx + 2) + (i + 1))];
+    }
+  }
+
+
+  // Every proc needs to have this recv buffer variable
+  std::vector<double> recv_buff;
+
+  if (rank == 0){
+    // Only proc 0 needs to resize the recv buffer
+    recv_buff.resize(static_cast<std::size_t>(size) * local_nx * local_ny);
+  }
+
+  //Now we do an MPI_Gather to 0.
+  MPI_Gather(send_buffer.data(), 
+            static_cast<int>(local_nx * local_ny), // Each rank needs to send this many elements
+            MPI_DOUBLE,
+            recv_buff.data(),
+            static_cast<int>(local_nx * local_ny), // Proc 0 will receive this many elements from each of the other  ranks
+            MPI_DOUBLE, 0, cart_comm);
+
+  std::vector<double> global_matrix;
+  if(rank == 0){
+    std::vector<double> global_matrix(nx_ * ny_, 0.0);
+
+    for(int _rank = 0; _rank < size; ++_rank){
+      int coords[2];
+      MPI_Cart_coords(cart_comm, _rank, 2, coords);
+      
+      int off_x = coords[0] * static_cast<int>(local_nx);
+      int off_y = coords[1] * static_cast<int>(local_ny);
+
+      double* block_recv_buff = recv_buff.data() + static_cast<std::size_t>(_rank) * (local_nx * local_ny);
+
+      for(std::size_t j = 0; j < local_ny; ++j){
+        for(std::size_t i = 0; i < local_nx; ++i){
+          std::size_t global_i = static_cast<std::size_t>(off_x) + i;
+          std::size_t global_j = static_cast<std::size_t>(off_y) + j;
+          global_matrix[global_j * nx_ + global_i] = block_recv_buff[j * local_nx + i];
+        }
+      }
+    }
+  }
+  MPI_Barrier(cart_comm);
+  return global_matrix;
+}
+
 
 void SWESolver::update_bcs(){
   const double coef = this->reflective_ ? -1.0 : 1.0;
