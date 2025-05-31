@@ -449,10 +449,11 @@ void SWESolver::local_init_dummy_tsunami(){
 void SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix){
   std::shared_ptr<XDMFWriter> writer;
   if (output_n > 0){
-    writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
     std::vector<double> mat = gather_data(this->cart_comm, this->rank, this->size, this->nx_, this->ny_, this->local_nx, this->local_ny, this->h0_);
+    std::vector<double> global_z = gather_data(this->cart_comm, this->rank, this->size, this->nx_, this->ny_, this->local_nx, this->local_ny, this->z_);
     
     if(rank == 0){
+      writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, global_z);
       writer->add_h(mat, 0.0);
     }
   }
@@ -654,7 +655,7 @@ std::vector<double> SWESolver::gather_data(const MPI_Comm cart_comm, int rank, i
 
   if (rank == 0){
     // Only proc 0 needs to resize the recv buffer
-    recv_buff.resize(static_cast<std::size_t>(size) * local_nx * local_ny);
+    recv_buff.resize(nx_ * ny_);
   }
 
   //Now we do an MPI_Gather to 0.
@@ -667,7 +668,7 @@ std::vector<double> SWESolver::gather_data(const MPI_Comm cart_comm, int rank, i
 
   std::vector<double> global_matrix;
   if(rank == 0){
-    std::vector<double> global_matrix(nx_ * ny_, 0.0);
+    global_matrix.resize(nx_ * ny_);
 
     for(int _rank = 0; _rank < size; ++_rank){
       int coords[2];
@@ -676,17 +677,22 @@ std::vector<double> SWESolver::gather_data(const MPI_Comm cart_comm, int rank, i
       int off_x = coords[0] * static_cast<int>(local_nx);
       int off_y = coords[1] * static_cast<int>(local_ny);
 
-      double* block_recv_buff = recv_buff.data() + static_cast<std::size_t>(_rank) * (local_nx * local_ny);
+      std::size_t block_start = static_cast<std::size_t>(_rank) * local_nx * local_ny;
 
       for(std::size_t j = 0; j < local_ny; ++j){
         for(std::size_t i = 0; i < local_nx; ++i){
-          std::size_t global_i = static_cast<std::size_t>(off_x) + i;
-          std::size_t global_j = static_cast<std::size_t>(off_y) + j;
-          global_matrix[global_j * nx_ + global_i] = block_recv_buff[j * local_nx + i];
+          std::size_t block_recv_index = block_start + j * local_nx + i;
+
+          std::size_t global_matrix_idx = ((off_y + j) * nx_) + (off_x + i);
+
+          global_matrix[global_matrix_idx] = recv_buff[block_recv_index];
         }
       }
     }
+    std::cout << "Size of global matrix: " << global_matrix.size() << std::endl;
   }
+  
+  
   MPI_Barrier(cart_comm);
   return global_matrix;
 }
