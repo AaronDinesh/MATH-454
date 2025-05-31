@@ -12,7 +12,7 @@ int main(int argc, char* argv[]){
   const std::size_t nx = std::stoi(argv[2]);
   const std::size_t ny = std::stoi(argv[3]);
   const std::size_t output_n = std::stoi(argv[4]);
-  const std::string output_fname = "water_drops";
+  const std::string output_fname = "./output_files/water_drops";
   const bool full_log = false;
 
   MPI_Init(&argc, &argv);
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]){
   // const std::size_t nx = 1000; // Number of cells per direction.
   // const std::size_t ny = 1000; // Number of cells per direction.
   // const std::size_t output_n = 10;
-  // const std::string output_fname = "analytical_tsunami";
+  // const std::string output_fname = "./output_files/analytical_tsunami";
   // const bool full_log = false;
 
   // SWESolver solver(test_case_id, nx, ny);
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]){
   // // const std::string fname = "Data_nx8001_500km.h5"; // File containg initial data (8001x8001 mesh).
 
   // const std::size_t output_n = 0;
-  // const std::string output_fname = "tsunami";
+  // const std::string output_fname = "./output_files/tsunami";
   // const bool full_log = false;
 
   // SWESolver solver(fname, size, size);

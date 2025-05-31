@@ -8,4 +8,6 @@
 #SBATCH --output=/dev/null
 
 
-srun --output=./parallel_time.txt ./swe 1 1000 1000 0
+srun --output=./parallel_time.txt ./swe 1 1000 1000 50
+source ./.venv/bin/activate
+python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames
