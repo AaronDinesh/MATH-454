@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --time=00:10:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --qos=math-454
+#SBATCH --account=math-454
+#SBATCH --output=/dev/null
+#SBATCH --mem=16G
+
+source ./.venv/bin/activate
+srun --output=./parallel_time.txt ./swe_gpu 1 1080 1080 50
+python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames

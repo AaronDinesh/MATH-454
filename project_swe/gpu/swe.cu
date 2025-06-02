@@ -1,6 +1,6 @@
 #include "swe.hh"
 #include "xdmf_writer.hh"
-
+#include "config.hh"
 #include <iostream>
 #include <cstddef>
 #include <vector>
@@ -9,18 +9,17 @@
 #include <hdf5.h>
 #include <hdf5_hl.h>
 #include <cstdio>
+#include <cuda_runtime.h>
 #include <cmath>
 #include <memory>
+#include "cuda_ops.hh" 
+
+
 
 namespace
 {
 
-void
-read_2d_array_from_DF5(const std::string &filename,
-                       const std::string &dataset_name,
-                       std::vector<double> &data,
-                       std::size_t &nx,
-                       std::size_t &ny)
+__host__ void read_2d_array_from_DF5(const std::string &filename, const std::string &dataset_name, std::vector<double> &data, std::size_t &nx, std::size_t &ny)
 {
   hid_t file_id, dataset_id, dataspace_id;
   hsize_t dims[2];
@@ -110,6 +109,28 @@ SWESolver::SWESolver(const int test_case_id, const std::size_t nx, const std::si
   {
     assert(false);
   }
+
+  // Here we sent all the data to the GPU
+  copy_to_device<double>(this->dptr_h0_, this->h0_.data() ,this->h0_.size());
+  copy_to_device<double>(this->dptr_h1_, this->h1_.data(), this->h1_.size());
+
+  copy_to_device<double>(this->dptr_hu0_, this->hu0_.data(), this->hu0_.size());
+  copy_to_device<double>(this->dptr_hv0_, this->hv0_.data(), this->hv0_.size());
+
+  copy_to_device<double>(this->dptr_z_, this->z_.data(), this->z_.size());
+  copy_to_device<double>(this->dptr_zdx_, this->zdx_.data(), this->zdx_.size());
+  copy_to_device<double>(this->dptr_zdy_, this->zdy_.data(), this->zdy_.size());
+
+
+  copy_to_device<double>(this->dptr_hu1_, this->hu1_.data(), this->hu1_.size());
+  copy_to_device<double>(this->dptr_hv1_, this->hv1_.data(), this->hv1_.size());
+
+  copy_to_device<bool>(this->dptr_reflective_, &this->reflective_, static_cast<std::size_t>(1));
+  copy_to_device<std::size_t>(this->dptr_nx_, &this->nx_, static_cast<std::size_t>(1));
+  copy_to_device<std::size_t>(this->dptr_ny_, &this->ny_, static_cast<std::size_t>(1));
+  copy_to_device<double>(this->dptr_size_x_, &this->size_x_, static_cast<std::size_t>(1));
+  copy_to_device<double>(this->dptr_size_y_, &this->size_y_, static_cast<std::size_t>(1));
+
 }
 
 SWESolver::SWESolver(const std::string &h5_file, const double size_x, const double size_y) :
@@ -118,9 +139,7 @@ SWESolver::SWESolver(const std::string &h5_file, const double size_x, const doub
   this->init_from_HDF5_file(h5_file);
 }
 
-void
-SWESolver::init_from_HDF5_file(const std::string &h5_file)
-{
+__host__ void SWESolver::init_from_HDF5_file(const std::string &h5_file){
   read_2d_array_from_DF5(h5_file, "h0", this->h0_, this->nx_, this->ny_);
   read_2d_array_from_DF5(h5_file, "hu0", this->hu0_, this->nx_, this->ny_);
   read_2d_array_from_DF5(h5_file, "hv0", this->hv0_, this->nx_, this->ny_);
@@ -133,9 +152,7 @@ SWESolver::init_from_HDF5_file(const std::string &h5_file)
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_gaussian()
-{
+__host__ void SWESolver::init_gaussian(){
   hu0_.resize(nx_ * ny_, 0.0);
   hv0_.resize(nx_ * ny_, 0.0);
   std::fill(hu0_.begin(), hu0_.end(), 0.0);
@@ -156,10 +173,8 @@ SWESolver::init_gaussian()
   const double dx = size_x_ / nx_;
   const double dy = size_y_ / ny_;
 
-  for (std::size_t j = 0; j < ny_; ++j)
-  {
-    for (std::size_t i = 0; i < nx_; ++i)
-    {
+  for (std::size_t j = 0; j < ny_; ++j){
+    for (std::size_t i = 0; i < nx_; ++i){
       const double x = dx * (static_cast<double>(i) + 0.5);
       const double y = dy * (static_cast<double>(j) + 0.5);
       const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
@@ -175,9 +190,7 @@ SWESolver::init_gaussian()
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_dummy_tsunami()
-{
+__host__ void SWESolver::init_dummy_tsunami(){
   hu0_.resize(nx_ * ny_);
   hv0_.resize(nx_ * ny_);
   std::fill(hu0_.begin(), hu0_.end(), 0.0);
@@ -203,10 +216,8 @@ SWESolver::init_dummy_tsunami()
   // Creating topography and initial water height
   z_.resize(nx_ * ny_);
   h0_.resize(nx_ * ny_);
-  for (std::size_t j = 0; j < ny_; ++j)
-  {
-    for (std::size_t i = 0; i < nx_; ++i)
-    {
+  for (std::size_t j = 0; j < ny_; ++j){
+    for (std::size_t i = 0; i < nx_; ++i){
       const double x = dx * (static_cast<double>(i) + 0.5);
       const double y = dy * (static_cast<double>(j) + 0.5);
 
@@ -224,147 +235,131 @@ SWESolver::init_dummy_tsunami()
   this->init_dx_dy();
 }
 
-void
-SWESolver::init_dummy_slope()
-{
-  hu0_.resize(nx_ * ny_);
-  hv0_.resize(nx_ * ny_);
-  std::fill(hu0_.begin(), hu0_.end(), 0.0);
-  std::fill(hv0_.begin(), hv0_.end(), 0.0);
 
-  h1_.resize(nx_ * ny_);
-  hu1_.resize(nx_ * ny_);
-  hv1_.resize(nx_ * ny_);
-  std::fill(h1_.begin(), h1_.end(), 0.0);
-  std::fill(hu1_.begin(), hu1_.end(), 0.0);
-  std::fill(hv1_.begin(), hv1_.end(), 0.0);
-
-  const double dx = size_x_ / nx_;
-  const double dy = size_y_ / ny_;
-
-  const double dz = 10.0;
-
-  // Creating topography and initial water height
-  z_.resize(nx_ * ny_);
-  h0_.resize(nx_ * ny_);
-  for (std::size_t j = 0; j < ny_; ++j)
-  {
-    for (std::size_t i = 0; i < nx_; ++i)
-    {
-      const double x = dx * (static_cast<double>(i) + 0.5);
-      const double y = dy * (static_cast<double>(j) + 0.5);
-      static_cast<void>(y);
-
-      const double z = -10.0 - 0.5 * dz + dz / size_x_ * x;
-      at(z_, i, j) = z;
-
-      double h0 = z < 0.0 ? -z : 0.00001;
-      at(h0_, i, j) = h0;
-    }
-  }
-  this->init_dx_dy();
-}
-
-void
-SWESolver::init_dx_dy()
-{
+__host__ void SWESolver::init_dx_dy() {
   zdx_.resize(this->z_.size(), 0.0);
   zdy_.resize(this->z_.size(), 0.0);
 
   const double dx = size_x_ / nx_;
   const double dy = size_y_ / ny_;
-  for (std::size_t j = 1; j < ny_ - 1; ++j)
-  {
-    for (std::size_t i = 1; i < nx_ - 1; ++i)
-    {
+  for (std::size_t j = 1; j < ny_ - 1; ++j){
+    for (std::size_t i = 1; i < nx_ - 1; ++i){
       at(this->zdx_, i, j) = 0.5 * (at(this->z_, i + 1, j) - at(this->z_, i - 1, j)) / dx;
       at(this->zdy_, i, j) = 0.5 * (at(this->z_, i, j + 1) - at(this->z_, i, j - 1)) / dy;
     }
   }
 }
 
-void
-SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix)
-{
+__host__ void SWESolver::solve(const double Tend, const bool full_log, const std::size_t output_n, const std::string &fname_prefix){
   std::shared_ptr<XDMFWriter> writer;
-  if (output_n > 0)
-  {
+  if (output_n > 0){
     writer = std::make_shared<XDMFWriter>(fname_prefix, this->nx_, this->ny_, this->size_x_, this->size_y_, this->z_);
+    cudaMemcpy(h0_.data(), dptr_h0_, sizeof(double) * nx_ * ny_, cudaMemcpyDeviceToHost);
     writer->add_h(h0_, 0.0);
   }
 
+  // Pre‐allocate partial_max buffers for CFL‐reduction
+  int bx = (nx_ - 2 + threads_per_block_x_ - 1) / threads_per_block_x_;
+  int by = (ny_ - 2 + threads_per_block_y_ - 1) / threads_per_block_y_;
+  int numBlocks = bx * by;
+  double *partial_max_d = nullptr;
+  double *partial_max_h = new double[numBlocks];
+  cudaMalloc(&partial_max_d, sizeof(double)*numBlocks);
+
   double T = 0.0;
 
-  std::vector<double> &h = h1_;
-  std::vector<double> &hu = hu1_;
-  std::vector<double> &hv = hv1_;
+  // std::vector<double> &h = h1_;
+  // std::vector<double> &hu = hu1_;
+  // std::vector<double> &hv = hv1_;
 
-  std::vector<double> &h0 = h0_;
-  std::vector<double> &hu0 = hu0_;
-  std::vector<double> &hv0 = hv0_;
+  // std::vector<double> &h0 = h0_;
+  // std::vector<double> &hu0 = hu0_;
+  // std::vector<double> &hv0 = hv0_;
 
   std::cout << "Solving SWE..." << std::endl;
 
-  std::size_t nt = 1;
-  while (T < Tend)
-  {
-    const double dt = this->compute_time_step(h0, hu0, hv0, T, Tend);
+  dim3 block1(threads_per_block_x_, threads_per_block_y_);
+  dim3 grid1(bx, by);
+  size_t sharedBytes = threads_per_block_x_ * threads_per_block_y_ * sizeof(double);
 
-    const double T1 = T + dt;
+  double dx = size_x_ / static_cast<double>(nx_);
+  double dy = size_y_ / static_cast<double>(ny_);
+
+
+  std::size_t nt = 1;
+
+  while (T < Tend){
+    compute_time_step_gpu<<<grid1, block1, sharedBytes>>>(dptr_h0_, dptr_hu0_, dptr_hv0_, static_cast<int>(nx_), static_cast<int>(ny_), g ,partial_max_d);
+    
+    cudaDeviceSynchronize();
+    cudaMemcpy(partial_max_h, partial_max_d, sizeof(double)*numBlocks, cudaMemcpyDeviceToHost);
+    
+    double max_nu2 = 0.0;
+    for(int i = 0; i < numBlocks; i++){
+      max_nu2 = std::max(max_nu2, partial_max_h[i]);
+    }
+    double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu2));
+    double T1 = T + dt;
 
     printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
     std::cout << (full_log ? "\n" : "\r") << std::flush;
 
-    this->update_bcs(h0, hu0, hv0, h, hu, hv);
 
-    this->solve_step(dt, h0, hu0, hv0, h, hu, hv);
+    //Perform the update of the boundary conditions in 2 passes
+    double coef = this->reflective_ ? -1.0 : 1.0;
+    int blocks_bcs_vert = (static_cast<int>(nx_) + threads_per_block_x_ - 1) / threads_per_block_x_;
+    update_bcs_vert_gpu<<<blocks_bcs_vert, threads_per_block_x_>>>(dptr_h0_, dptr_hu0_, dptr_hv0_, dptr_h1_, dptr_hu1_, dptr_hv1_, static_cast<int>(nx_), static_cast<int>(ny_), coef);
+
+    int blocks_bcs_horiz = (static_cast<int>(ny_) + threads_per_block_x_ - 1) / threads_per_block_x_;
+    update_bcs_horiz_gpu<<<blocks_bcs_horiz, threads_per_block_y_>>>(dptr_h0_, dptr_hu0_, dptr_hv0_, dptr_h1_, dptr_hu1_, dptr_hv1_, static_cast<int>(nx_), static_cast<int>(ny_), coef);
+
+    cudaDeviceSynchronize();
+    
+    // CPU CODE FROM HERE BELOW
+    solve_step_mega_kernel<<<grid1, block1>>>(dptr_h0_, dptr_hu0_, dptr_hv0_, dptr_zdx_, dptr_zdy_, dptr_h1_, dptr_hu1_, dptr_hv1_, static_cast<int>(nx_), static_cast<int>(ny_), dt, size_x_, size_y_, g);
 
     if (output_n > 0 && nt % output_n == 0)
     {
-      writer->add_h(h, T1);
+      cudaMemcpy(h1_.data(), dptr_h1_, sizeof(double) * nx_ * ny_, cudaMemcpyDeviceToHost);
+      writer->add_h(h1_, T1);
     }
+    cudaDeviceSynchronize();
     ++nt;
 
     // Swap the old and new solutions
-    std::swap(h, h0);
-    std::swap(hu, hu0);
-    std::swap(hv, hv0);
+    std::swap(dptr_h1_, dptr_h0_);
+    std::swap(dptr_hu1_, dptr_hu0_);
+    std::swap(dptr_hv1_, dptr_hv0_);
 
     T = T1;
   }
 
   // Copying last computed values to h1_, hu1_, hv1_ (if needed)
-  if (&h0 != &h1_)
-  {
-    h1_ = h0;
-    hu1_ = hu0;
-    hv1_ = hv0;
-  }
+  cudaMemcpy(h1_.data(), dptr_h0_, sizeof(double) * nx_ * ny_, cudaMemcpyDeviceToHost);
+  cudaMemcpy(hu1_.data(), dptr_hu0_, sizeof(double) * nx_ * ny_, cudaMemcpyDeviceToHost);
+  cudaMemcpy(hv1_.data(), dptr_hv0_, sizeof(double) * nx_ * ny_, cudaMemcpyDeviceToHost);
 
-  if (output_n > 0)
-  {
+  if (output_n > 0){
     writer->add_h(h1_, T);
   }
 
   std::cout << "Finished solving SWE." << std::endl;
+  delete[] partial_max_h;
+  cudaFree(partial_max_d);
 }
 
-double
-SWESolver::compute_time_step(const std::vector<double> &h,
-                             const std::vector<double> &hu,
-                             const std::vector<double> &hv,
-                             const double T,
-                             const double Tend) const
-{
+__host__ void SWESolver::setThreadsPerBlock(int tx, int ty){
+  threads_per_block_x_ = tx;
+  threads_per_block_y_ = ty;
+}
+
+
+double SWESolver::compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const{
   double max_nu_sqr = 0.0;
-  double au{0.0};
-  double av{0.0};
   for (std::size_t j = 1; j < ny_ - 1; ++j)
   {
     for (std::size_t i = 1; i < nx_ - 1; ++i)
     {
-      au = std::max(au, std::fabs(at(hu, i, j)));
-      av = std::max(av, std::fabs(at(hv, i, j)));
       const double nu_u = std::fabs(at(hu, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
       const double nu_v = std::fabs(at(hv, i, j)) / at(h, i, j) + sqrt(g * at(h, i, j));
       max_nu_sqr = std::max(max_nu_sqr, nu_u * nu_u + nu_v * nu_v);
@@ -377,17 +372,9 @@ SWESolver::compute_time_step(const std::vector<double> &h,
   return std::min(dt, Tend - T);
 }
 
-void
-SWESolver::compute_kernel(const std::size_t i,
-                          const std::size_t j,
-                          const double dt,
-                          const std::vector<double> &h0,
-                          const std::vector<double> &hu0,
-                          const std::vector<double> &hv0,
-                          std::vector<double> &h,
-                          std::vector<double> &hu,
-                          std::vector<double> &hv) const
-{
+
+
+void SWESolver::compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
   const double dx = size_x_ / nx_;
   const double dy = size_x_ / ny_;
   const double C1x = 0.5 * dt / dx;
@@ -449,14 +436,7 @@ SWESolver::compute_kernel(const std::size_t i,
 }
 
 void
-SWESolver::solve_step(const double dt,
-                      const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const
-{
+SWESolver::solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
   for (std::size_t j = 1; j < ny_ - 1; ++j)
   {
     for (std::size_t i = 1; i < nx_ - 1; ++i)
@@ -466,14 +446,8 @@ SWESolver::solve_step(const double dt,
   }
 }
 
-void
-SWESolver::update_bcs(const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const
-{
+
+void SWESolver::update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const{
   const double coef = this->reflective_ ? -1.0 : 1.0;
 
   // Top and bottom boundaries.
@@ -501,4 +475,25 @@ SWESolver::update_bcs(const std::vector<double> &h0,
     at(hv, 0, j) = at(hv0, 1, j);
     at(hv, nx_ - 1, j) = at(hv0, nx_ - 2, j);
   }
-};
+}
+
+
+
+SWESolver::~SWESolver(){
+  cudaFree((void*) dptr_h0_);
+  cudaFree((void*) dptr_hu0_);
+  cudaFree((void*) dptr_hv0_);
+  cudaFree((void*) dptr_h1_);
+  cudaFree((void*) dptr_hu1_);
+  cudaFree((void*) dptr_hv1_);
+  cudaFree((void*) dptr_z_);
+  cudaFree((void*) dptr_zdx_);
+  cudaFree((void*) dptr_zdy_);
+  cudaFree((void*) dptr_reflective_);
+  cudaFree((void*) dptr_nx_);
+  cudaFree((void*) dptr_ny_);
+  cudaFree((void*) dptr_size_x_);
+  cudaFree((void*) dptr_size_y_);
+}
+
+

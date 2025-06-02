@@ -1,9 +1,8 @@
 #include <cstddef>
 #include <vector>
 #include <string>
-
-class SWESolver
-{
+#include <cuda_runtime.h>
+class SWESolver {
 public:
   /**
    * @brief Constructor for the SWESolver class.
@@ -33,6 +32,8 @@ public:
    * @param size_y  Size in km along the y direction.
    */
   SWESolver(const std::string &h5_file, const double size_x, const double size_y);
+  
+  ~SWESolver();
 
   /**
    * @brief Solve the shallow water equations.
@@ -46,48 +47,14 @@ public:
    * @brief fname_prefix If @p output_n is different from 0, the generated
    * files will use this file name prefix.
    */
-  void solve(const double Tend,
-             const bool full_log = false,
-             const std::size_t output_n = 0,
-             const std::string &fname_prefix = "test");
+  __host__ void solve(const double Tend, const bool full_log = false, const std::size_t output_n = 0, const std::string &fname_prefix = "test");
+  
+  __host__ void setThreadsPerBlock(int tx, int ty);
 
 private:
-  /**
-   * @brief Initializes the initial conditions and topography using
-   * the provided HDF5 file.
-   *
-   * @param h5_file HDF5 file name containing the initial conditions and topography.
-   */
-  void init_from_HDF5_file(const std::string &h5_file);
-
-  /**
-   * @brief Initializes the initial conditions and topography using
-   * a Gaussian function.
-   *
-   * The water height is initialized with two separated Gaussian peaks.
-   * The initial water velocity is set to zero and the topography is set to zero.
-   */
-  void init_gaussian();
-
-  /**
-   * @brief Initializes the initial conditions and topography using
-   * a dummy tsunami function.
-   */
-  void init_dummy_tsunami();
-
-  /**
-   * @brief Initializes the initial conditions and topography using
-   * a slope function.
-   */
-  void init_dummy_slope();
-
-  /**
-   * @brief Initializes the derivatives dx and dy from the topography.
-   */
-  void init_dx_dy();
-
   std::size_t nx_;
   std::size_t ny_;
+
   double size_x_;
   double size_y_;
   bool reflective_;
@@ -100,6 +67,56 @@ private:
   std::vector<double> z_;
   std::vector<double> zdx_;
   std::vector<double> zdy_;
+  
+
+  std::size_t* dptr_nx_;
+  std::size_t* dptr_ny_;
+  double* dptr_size_x_;
+  double* dptr_size_y_;
+  bool* dptr_reflective_;
+  double* dptr_h0_;
+  double* dptr_h1_;
+  double* dptr_hu0_;
+  double* dptr_hu1_;
+  double* dptr_hv0_;
+  double* dptr_hv1_;
+  double* dptr_z_;
+  double* dptr_zdx_;
+  double* dptr_zdy_;
+
+  int threads_per_block_x_ = 16; // max 1024
+  int threads_per_block_y_ = 16; // max 1024
+
+
+/**
+   * @brief Initializes the initial conditions and topography using
+   * the provided HDF5 file.
+   *
+   * @param h5_file HDF5 file name containing the initial conditions and topography.
+   */
+  __host__ void init_from_HDF5_file(const std::string &h5_file);
+
+  /**
+   * @brief Initializes the initial conditions and topography using
+   * a Gaussian function.
+   *
+   * The water height is initialized with two separated Gaussian peaks.
+   * The initial water velocity is set to zero and the topography is set to zero.
+   */
+  __host__ void init_gaussian();
+
+  /**
+   * @brief Initializes the initial conditions and topography using
+   * a dummy tsunami function.
+   */
+  __host__ void init_dummy_tsunami();
+
+  /**
+   * @brief Initializes the derivatives dx and dy from the topography.
+   */
+  __host__ void init_dx_dy();
+
+  
 
   /**
    * @brief Accessor for 2D vector elements.
@@ -130,15 +147,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void compute_kernel(const std::size_t i,
-                      const std::size_t j,
-                      const double dt,
-                      const std::vector<double> &h0,
-                      const std::vector<double> &hu0,
-                      const std::vector<double> &hv0,
-                      std::vector<double> &h,
-                      std::vector<double> &hu,
-                      std::vector<double> &hv) const;
+  void compute_kernel(const std::size_t i, const std::size_t j, const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
 
   /**
    * @brief Computes the time step size that satisfied the CFL condition.
@@ -150,12 +159,10 @@ private:
    * @param Tend Final time.
    * @return Compute time step.
    */
-  double compute_time_step(const std::vector<double> &h,
-                           const std::vector<double> &hu,
-                           const std::vector<double> &hv,
-                           const double T,
-                           const double Tend) const;
+  double compute_time_step(const std::vector<double> &h, const std::vector<double> &hu, const std::vector<double> &hv, const double T, const double Tend) const;
 
+
+    
   /**
    * @brief Solve one step of the SWE.
    * @param dt The time step size.
@@ -166,13 +173,7 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void solve_step(const double dt,
-                  const std::vector<double> &h0,
-                  const std::vector<double> &hu0,
-                  const std::vector<double> &hv0,
-                  std::vector<double> &h,
-                  std::vector<double> &hu,
-                  std::vector<double> &hv) const;
+  void solve_step(const double dt, const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const;
 
   /**
    * @brief Update boundary conditions.
@@ -184,10 +185,5 @@ private:
    * @param hu The x water velocity in the current time step.
    * @param hv The y water velocity in the current time step.
    */
-  void update_bcs(const std::vector<double> &h0,
-                  const std::vector<double> &hu0,
-                  const std::vector<double> &hv0,
-                  std::vector<double> &h,
-                  std::vector<double> &hu,
-                  std::vector<double> &hv) const;
+  void update_bcs(const std::vector<double> &h0, const std::vector<double> &hu0, const std::vector<double> &hv0, std::vector<double> &h, std::vector<double> &hu, std::vector<double> &hv) const; 
 };
