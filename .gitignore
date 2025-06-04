@@ -14,3 +14,4 @@ project_swe/data/*
 **/*.h5
 **/output_files/
 **/.venv/
+**/*.mp4

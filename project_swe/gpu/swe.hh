@@ -69,20 +69,20 @@ private:
   std::vector<double> zdy_;
   
 
-  std::size_t* dptr_nx_;
-  std::size_t* dptr_ny_;
-  double* dptr_size_x_;
-  double* dptr_size_y_;
-  bool* dptr_reflective_;
-  double* dptr_h0_;
-  double* dptr_h1_;
-  double* dptr_hu0_;
-  double* dptr_hu1_;
-  double* dptr_hv0_;
-  double* dptr_hv1_;
-  double* dptr_z_;
-  double* dptr_zdx_;
-  double* dptr_zdy_;
+  std::size_t* dptr_nx_ = nullptr;
+  std::size_t* dptr_ny_ = nullptr;
+  double* dptr_size_x_ = nullptr;
+  double* dptr_size_y_ = nullptr;
+  bool* dptr_reflective_ = nullptr;
+  double* dptr_h0_ = nullptr;
+  double* dptr_h1_ = nullptr;
+  double* dptr_hu0_ = nullptr;;
+  double* dptr_hu1_ = nullptr;
+  double* dptr_hv0_ = nullptr;
+  double* dptr_hv1_ = nullptr;
+  double* dptr_z_ = nullptr;
+  double* dptr_zdx_ = nullptr;
+  double* dptr_zdy_ = nullptr;
 
   int threads_per_block_x_ = 16; // max 1024
   int threads_per_block_y_ = 16; // max 1024
