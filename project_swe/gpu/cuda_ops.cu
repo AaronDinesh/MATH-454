@@ -25,9 +25,9 @@ __global__ void compute_time_step_gpu(const double* __restrict__ dptr_h, const d
     double hij  = dptr_h[j * nx + i];
     double huij = dptr_hu[j * nx + i];
     double hvij = dptr_hv[j * nx + i];
-    double sqrt_h = sqrt(hij);
-    double nu_u = fabs(huij)/hij + sqrt_h;
-    double nu_v = fabs(hvij)/hij + sqrt_h;
+    double sqrt_gh = sqrt(hij*g);
+    double nu_u = fabs(huij)/hij + sqrt_gh;
+    double nu_v = fabs(hvij)/hij + sqrt_gh;
     nu2 = nu_u * nu_u + nu_v * nu_v;
   }
 

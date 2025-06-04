@@ -95,13 +95,19 @@ SWESolver::SWESolver(const int test_case_id, const std::size_t nx, const std::si
   nx_(nx), ny_(ny), size_x_(500.0), size_y_(500.0)
 {
   assert(test_case_id == 1 || test_case_id == 2);
-  if (test_case_id == 1)
-  {
+  if (test_case_id == 1){
+    #if DEBUG
+      std::cout << "Gaussian test case" << std::endl;
+    #endif
+
     this->reflective_ = true;
     this->init_gaussian();
   }
   else if (test_case_id == 2)
   {
+    #if DEBUG
+      std::cout << "Tsunami test case" << std::endl;
+    #endif
     this->reflective_ = false;
     this->init_dummy_tsunami();
   }
@@ -164,6 +170,11 @@ __host__ void SWESolver::init_gaussian(){
   h1_.resize(nx_ * ny_);
   hu1_.resize(nx_ * ny_);
   hv1_.resize(nx_ * ny_);
+
+  std::fill(h1_.begin(), h1_.end(), 0.0);
+  std::fill(hu1_.begin(), hu1_.end(), 0.0);
+  std::fill(hv1_.begin(), hv1_.end(), 0.0);
+
 
   const double x0_0 = size_x_ / 4.0;
   const double y0_0 = size_y_ / 3.0;
@@ -264,7 +275,9 @@ __host__ void SWESolver::solve(const double Tend, const bool full_log, const std
   int numBlocks = bx * by;
   double *partial_max_d = nullptr;
   double *partial_max_h = new double[numBlocks];
-  cudaMalloc(&partial_max_d, sizeof(double)*numBlocks);
+  memset(partial_max_h, 0, numBlocks*sizeof(double));
+  zero_malloc_on_device<double>(partial_max_d, numBlocks);
+  //cudaMalloc(&partial_max_d, sizeof(double)*numBlocks);
 
   double T = 0.0;
 
@@ -276,7 +289,9 @@ __host__ void SWESolver::solve(const double Tend, const bool full_log, const std
   // std::vector<double> &hu0 = hu0_;
   // std::vector<double> &hv0 = hv0_;
 
-  std::cout << "Solving SWE..." << std::endl;
+  #if DEBUG
+    std::cout << "Solving SWE..." << std::endl;
+  #endif
 
   dim3 block1(threads_per_block_x_, threads_per_block_y_);
   dim3 grid1(bx, by);
@@ -300,10 +315,13 @@ __host__ void SWESolver::solve(const double Tend, const bool full_log, const std
     }
     double dt = std::min(dx, dy) / (sqrt(2.0 * max_nu2));
     double T1 = T + dt;
+    memset(partial_max_h, 0, numBlocks*sizeof(double));
+    cudaMemsetAsync(partial_max_d, 0, numBlocks*sizeof(double), cudaStreamDefault);
 
-    printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
-    std::cout << (full_log ? "\n" : "\r") << std::flush;
-
+    #if DEBUG
+      printf("Computing T: %2.4f hr  (dt = %.2e s) -- %3.3f%%", T1, dt * 3600, 100 * T1 / Tend);
+      std::cout << (full_log ? "\n" : "\r") << std::flush;
+    #endif
 
     //Perform the update of the boundary conditions in 2 passes
     double coef = this->reflective_ ? -1.0 : 1.0;
@@ -343,7 +361,9 @@ __host__ void SWESolver::solve(const double Tend, const bool full_log, const std
     writer->add_h(h1_, T);
   }
 
-  std::cout << "Finished solving SWE." << std::endl;
+  #if DEBUG
+    std::cout << "Finished solving SWE." << std::endl;
+  #endif
   delete[] partial_max_h;
   cudaFree(partial_max_d);
 }

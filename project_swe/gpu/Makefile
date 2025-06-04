@@ -35,3 +35,5 @@ $(TARGET): $(SRC_CC) $(SRC_CU) swe.hh xdmf_writer.hh cuda_ops.hh
 clean:
 	@echo "==> Cleaning up"
 	rm -f $(TARGET) *.o
+	find ./output_files -type f -exec rm {} +
+	rm -f water_animation_3d.mp4
