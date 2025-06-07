@@ -9,5 +9,6 @@
 #SBATCH --mem=16G
 
 source ./.venv/bin/activate
-srun --output=./parallel_time.txt ./swe_gpu 1 1080 1080 10 16 16
+#srun --output=./parallel_time.txt ./swe_gpu 1 1080 1080 10 16 16
+nvprof -s --print-gpu-trace -o ./results.nvprof ./swe_gpu 1 1080 1080 10 16 16
 python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames

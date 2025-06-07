@@ -143,6 +143,27 @@ SWESolver::SWESolver(const std::string &h5_file, const double size_x, const doub
   size_x_(size_x), size_y_(size_y), reflective_(false)
 {
   this->init_from_HDF5_file(h5_file);
+
+  // Here we sent all the data to the GPU
+  copy_to_device<double>(this->dptr_h0_, this->h0_.data() ,this->h0_.size());
+  copy_to_device<double>(this->dptr_h1_, this->h1_.data(), this->h1_.size());
+
+  copy_to_device<double>(this->dptr_hu0_, this->hu0_.data(), this->hu0_.size());
+  copy_to_device<double>(this->dptr_hv0_, this->hv0_.data(), this->hv0_.size());
+
+  copy_to_device<double>(this->dptr_z_, this->z_.data(), this->z_.size());
+  copy_to_device<double>(this->dptr_zdx_, this->zdx_.data(), this->zdx_.size());
+  copy_to_device<double>(this->dptr_zdy_, this->zdy_.data(), this->zdy_.size());
+
+
+  copy_to_device<double>(this->dptr_hu1_, this->hu1_.data(), this->hu1_.size());
+  copy_to_device<double>(this->dptr_hv1_, this->hv1_.data(), this->hv1_.size());
+
+  copy_to_device<bool>(this->dptr_reflective_, &this->reflective_, static_cast<std::size_t>(1));
+  copy_to_device<std::size_t>(this->dptr_nx_, &this->nx_, static_cast<std::size_t>(1));
+  copy_to_device<std::size_t>(this->dptr_ny_, &this->ny_, static_cast<std::size_t>(1));
+  copy_to_device<double>(this->dptr_size_x_, &this->size_x_, static_cast<std::size_t>(1));
+  copy_to_device<double>(this->dptr_size_y_, &this->size_y_, static_cast<std::size_t>(1));
 }
 
 __host__ void SWESolver::init_from_HDF5_file(const std::string &h5_file){
