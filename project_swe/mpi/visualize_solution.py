@@ -101,68 +101,68 @@ if __name__ == "__main__":
         output_filename_base = os.path.join(args.output, f"{basename}_vis") 
         os.makedirs(args.output, exist_ok=True)
 
-    if args.vis_type == "2d":
-        for i in tqdm.tqdm(range(len(H))):
-            plt.figure(figsize=(8, 6))
-            plt.pcolormesh(X, Y, H[i], shading="auto", cmap="viridis")
-            plt.colorbar(label="Water height h")
-            plt.title(f"Shallow Water Height at timestep {i}")
-            plt.xlabel("x")
-            plt.ylabel("y")
-            plt.axis("equal")
-            plt.tight_layout()
-            if args.output:
-                plt.savefig(f"{output_filename_base}_{i:04d}.png")
-                plt.close()
-            else:
-                plt.show()
-                plt.close()
-    
+    if len(os.listdir("frames")) == 0:
+        if args.vis_type == "2d":
+            for i in tqdm.tqdm(range(len(H))):
+                plt.figure(figsize=(8, 6))
+                plt.pcolormesh(X, Y, H[i], shading="auto", cmap="viridis")
+                plt.colorbar(label="Water height h")
+                plt.title(f"Shallow Water Height at timestep {i}")
+                plt.xlabel("x")
+                plt.ylabel("y")
+                plt.axis("equal")
+                plt.tight_layout()
+                if args.output:
+                    plt.savefig(f"{output_filename_base}_{i:04d}.png")
+                    plt.close()
+                else:
+                    plt.show()
+                    plt.close()
+        elif args.vis_type == "3d":
+            z_scale = 10 # Exaggerate the z-axis for better visualization
 
-    elif args.vis_type == "3d":
-        z_scale = 10 # Exaggerate the z-axis for better visualization
-
-        # Set up a consistent camera position for the 3D plot
-        if args.frame < 0 and args.output:
-            Z_ref = z_scale * (B + np.max(h_data, axis=0).reshape((ny, nx)))
-            grid_ref = pv.StructuredGrid(X, Y, Z_ref)
-            # Create a temp plotter just to extract camera position
-            p_ref = pv.Plotter(off_screen=True)
-            p_ref.add_mesh(grid_ref)
-            p_ref.view_isometric()
-            p_ref.camera.zoom(0.9)
-            camera_position = p_ref.camera_position
-            p_ref.close()  # Important!
-
-        for i in tqdm.tqdm(range(len(H))):
-            Z = B + H[i]
-            
-            Z_exaggerated = z_scale * (B + h_data[i].reshape((ny, nx)))
-            
-            grid = pv.StructuredGrid(uinput = X, y=Y, z=Z_exaggerated)
-            if args.output:
-                plotter = pv.Plotter(off_screen=True)
-            else:
-                plotter = pv.Plotter(off_screen=False)
-            
-            plotter.add_mesh(grid, scalars=grid.points[:, 2], cmap="viridis")
-
-            plotter.set_background("white")
-            # Update camera position to avoid wobbling
+            # Set up a consistent camera position for the 3D plot
             if args.frame < 0 and args.output:
-                plotter.camera_position = camera_position
-            
-            if args.output:
-                plotter.screenshot(f"{output_filename_base}_{i:04d}.png")
-                plotter.close()
-            else:
-                plotter.show()
-                plotter.close()
+                Z_ref = z_scale * (B + np.max(h_data, axis=0).reshape((ny, nx)))
+                grid_ref = pv.StructuredGrid(X, Y, Z_ref)
+                # Create a temp plotter just to extract camera position
+                p_ref = pv.Plotter(off_screen=True)
+                p_ref.add_mesh(grid_ref)
+                p_ref.view_isometric()
+                p_ref.camera.zoom(0.9)
+                camera_position = p_ref.camera_position
+                p_ref.close()  # Important!
 
+            for i in tqdm.tqdm(range(len(H))):
+                Z = B + H[i]
+
+                Z_exaggerated = z_scale * (B + h_data[i].reshape((ny, nx)))
+
+                grid = pv.StructuredGrid(uinput = X, y=Y, z=Z_exaggerated)
+                if args.output:
+                    plotter = pv.Plotter(off_screen=True)
+                else:
+                    plotter = pv.Plotter(off_screen=False)
+
+                plotter.add_mesh(grid, scalars=grid.points[:, 2], cmap="viridis")
+
+                plotter.set_background("white")
+                # Update camera position to avoid wobbling
+                if args.frame < 0 and args.output:
+                    plotter.camera_position = camera_position
+
+                if args.output:
+                    plotter.screenshot(f"{output_filename_base}_{i:04d}.png")
+                    plotter.close()
+                else:
+                    plotter.show()
+                    plotter.close()
+    else:
+        print("Frames already exist. Skipping generation.")
 
     ## Make the annimation video from the frames
     frame_dir = "frames"
-    pattern = os.path.join(frame_dir, "water_drops_vis_*.png")
+    pattern = os.path.join(frame_dir, f"{basename}_vis_*.png")
 
     # Output video file
     output_video = "water_animation_3d.mp4"

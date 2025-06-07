@@ -100,8 +100,6 @@ SWESolver::SWESolver(const int test_case_id, const std::size_t nx, const std::si
 {
   assert(test_case_id == 1 || test_case_id == 2);
   
-
-
   //Build our Cartesian Communicator
   MPI_Comm_size(comm, &this->size);
   MPI_Comm_rank(comm, &this->rank);
@@ -157,62 +155,105 @@ SWESolver::SWESolver(const int test_case_id, const std::size_t nx, const std::si
   }
 }
 
-SWESolver::SWESolver(const std::string &h5_file, const double size_x, const double size_y) :
+SWESolver::SWESolver(const std::string &h5_file, const double size_x, const double size_y, MPI_Comm comm)
   size_x_(size_x), size_y_(size_y), reflective_(false)
 {
-  this->init_from_HDF5_file(h5_file);
+  this->init_from_HDF5_file(h5_file);  
 }
 
-void SWESolver::init_from_HDF5_file(const std::string &h5_file){
-  read_2d_array_from_DF5(h5_file, "h0", this->h0_, this->nx_, this->ny_);
-  read_2d_array_from_DF5(h5_file, "hu0", this->hu0_, this->nx_, this->ny_);
-  read_2d_array_from_DF5(h5_file, "hv0", this->hv0_, this->nx_, this->ny_);
-  read_2d_array_from_DF5(h5_file, "topography", this->z_, this->nx_, this->ny_);
+void SWESolver::init_from_HDF5_file(const std::string &h5_file, MPI_Comm comm){
+  //Build our Cartesian Communicator
+  MPI_Comm_size(comm, &this->size);
+  MPI_Comm_rank(comm, &this->rank);
+  dims[0] = dims[1] = 0;
+  MPI_Dims_create(this->size, 2, dims);
+  int periods[2] = {0,0};
+  MPI_Cart_create(comm, 2, dims, periods, 1, &this->cart_comm);
+  MPI_Cart_coords(this->cart_comm, this->rank, 2, this->coords);
 
-  this->h1_.resize(this->h0_.size(), 0.0);
-  this->hu1_.resize(this->hu0_.size(), 0.0);
-  this->hv1_.resize(this->hv0_.size(), 0.0);
+  // This is computing my neighbors
+  MPI_Cart_shift(this->cart_comm, 0, 1, &this->neighbor_west, &this->neighbor_east);
+  MPI_Cart_shift(this->cart_comm, 1, 1, &this->neighbor_south, &this->neighbor_north);
+  
+  // This is making sure we can evenly divide the domain
+  assert(nx_ % dims[0] == 0 && ny_ % dims[1] == 0);
 
-  // this->init_dx_dy();
+
+  // Calculating the local size of my grid as well as the offsets that I need to work with
+  local_nx = nx_ / dims[0];
+  local_ny = ny_ / dims[1];
+  offset_x = coords[0] * local_nx;
+  offset_y = coords[1] * local_ny;
+
+  //This is a function that will resize a vector to inlcude the ghost layers around each local grid. These ghost layers
+  //are needed so that the cells at the boundaries of each local grid can be updated with information from its
+  //neighboring grid.
+  auto add_ghost = [&](std::vector<double>& V){
+    V.resize((local_nx+2)*(local_ny+2), 0.0);
+  };
+
+  // Here we add all the ghost layers
+  add_ghost(h0_); 
+  add_ghost(h1_);
+  add_ghost(hu0_); 
+  add_ghost(hu1_);
+  add_ghost(hv0_); 
+  add_ghost(hv1_);
+  add_ghost(z_);  
+  add_ghost(zdx_); 
+  add_ghost(zdy_);
+
+  std::vector<double> a, b, c, d;
+  if rank == 0{
+    read_2d_array_from_DF5(h5_file, "h0", this->a, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "hu0", this->b, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "hv0", this->c, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "topography", this->d, this->nx_, this->ny_);
+  }
+
+    // 7. Scatter blocks from root
+  auto scatter_block = [&](std::vector<double>& full_data, std::vector<double>& local_data){
+    std::vector<double> local_block(local_nx * local_ny);
+    if (rank == 0){
+      for (int r = 0; r < size; ++r){
+        int coords[2];
+        //Get the coords of every processor to figure what offset i should start at
+        MPI_Cart_coords(cart_comm, r, 2, coords);
+        int ox = coords[0] * local_nx;
+        int oy = coords[1] * local_ny;
+
+        std::vector<double> tmp(local_nx * local_ny);
+        for (int j = 0; j < local_ny; ++j){
+          for (int i = 0; i < local_nx; ++i){
+            tmp[j * local_nx + i] = full_data[(oy + j) * nx_ + (ox + i)];
+          }
+        }
+        if (r == 0){
+          local_block = tmp;
+        } else {
+          MPI_Send(tmp.data(), tmp.size(), MPI_DOUBLE, r, 0, cart_comm);
+        }
+      }
+    } else {
+      MPI_Recv(local_block.data(), local_block.size(), MPI_DOUBLE, 0, 0, cart_comm, MPI_STATUS_IGNORE);
+    }
+
+    // Copy into center of ghosted array
+    for (int j = 0; j < local_ny; ++j){
+      for (int i = 0; i < local_nx; ++i){
+        at(local_data, i+1, j+1) = local_block[j * local_nx + i];
+      }
+    }
+  };
+
+  scatter_block(a, h0_);
+  scatter_block(b, hu0_);
+  scatter_block(c, hv0_);
+  scatter_block(d, z_);
+  this->exchange_halos();
+  this->local_init_dx_dy();
 }
 
-// void SWESolver::init_gaussian(){
-//   hu0_.resize(nx_ * ny_, 0.0);
-//   hv0_.resize(nx_ * ny_, 0.0);
-//   std::fill(hu0_.begin(), hu0_.end(), 0.0);
-//   std::fill(hv0_.begin(), hv0_.end(), 0.0);
-
-//   h0_.clear();
-//   h0_.reserve(nx_ * ny_);
-
-//   h1_.resize(nx_ * ny_);
-//   hu1_.resize(nx_ * ny_);
-//   hv1_.resize(nx_ * ny_);
-
-//   const double x0_0 = size_x_ / 4.0;
-//   const double y0_0 = size_y_ / 3.0;
-//   const double x0_1 = size_x_ / 2.0;
-//   const double y0_1 = 0.75 * size_y_;
-
-//   const double dx = size_x_ / nx_;
-//   const double dy = size_y_ / ny_;
-
-//   for (std::size_t j = 0; j < ny_; ++j){
-//     for (std::size_t i = 0; i < nx_; ++i){
-//       const double x = dx * (static_cast<double>(i) + 0.5);
-//       const double y = dy * (static_cast<double>(j) + 0.5);
-//       const double gauss_0 = 10.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 1000.0);
-//       const double gauss_1 = 10.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 1000.0);
-
-//       h0_.push_back(10.0 + gauss_0 + gauss_1);
-//     }
-//   }
-
-//   z_.resize(this->h0_.size());
-//   std::fill(z_.begin(), z_.end(), 0.0);
-
-//   this->init_dx_dy();
-// }
 
 void SWESolver::exchange_halos(){
   MPI_Datatype column_dtype;
@@ -304,54 +345,6 @@ void SWESolver::local_init_gaussian(){
   this->exchange_halos();
   this->local_init_dx_dy();
 }
-
-
-
-// void SWESolver::init_dummy_tsunami(){
-//   hu0_.resize(nx_ * ny_);
-//   hv0_.resize(nx_ * ny_);
-//   std::fill(hu0_.begin(), hu0_.end(), 0.0);
-//   std::fill(hv0_.begin(), hv0_.end(), 0.0);
-
-//   h1_.resize(nx_ * ny_);
-//   hu1_.resize(nx_ * ny_);
-//   hv1_.resize(nx_ * ny_);
-//   std::fill(h1_.begin(), h1_.end(), 0.0);
-//   std::fill(hu1_.begin(), hu1_.end(), 0.0);
-//   std::fill(hv1_.begin(), hv1_.end(), 0.0);
-
-//   const double x0_0 = 0.6 * size_x_;
-//   const double y0_0 = 0.6 * size_y_;
-//   const double x0_1 = 0.4 * size_x_;
-//   const double y0_1 = 0.4 * size_y_;
-//   const double x0_2 = 0.7 * size_x_;
-//   const double y0_2 = 0.3 * size_y_;
-
-//   const double dx = size_x_ / nx_;
-//   const double dy = size_y_ / ny_;
-
-//   // Creating topography and initial water height
-//   z_.resize(nx_ * ny_);
-//   h0_.resize(nx_ * ny_);
-//   for (std::size_t j = 0; j < ny_; ++j){
-//     for (std::size_t i = 0; i < nx_; ++i){
-//       const double x = dx * (static_cast<double>(i) + 0.5);
-//       const double y = dy * (static_cast<double>(j) + 0.5);
-
-//       const double gauss_0 = 2.0 * std::exp(-((x - x0_0) * (x - x0_0) + (y - y0_0) * (y - y0_0)) / 3000.0);
-//       const double gauss_1 = 3.0 * std::exp(-((x - x0_1) * (x - x0_1) + (y - y0_1) * (y - y0_1)) / 10000.0);
-//       const double gauss_2 = 5.0 * std::exp(-((x - x0_2) * (x - x0_2) + (y - y0_2) * (y - y0_2)) / 100.0);
-
-//       const double z = -1.0 + gauss_0 + gauss_1;
-//       at(z_, i, j) = z;
-
-//       double h0 = z < 0.0 ? -z + gauss_2 : 0.00001;
-//       at(h0_, i, j) = h0;
-//     }
-//   }
-//   this->init_dx_dy();
-// }
-
 
 void SWESolver::local_init_dummy_tsunami(){
 

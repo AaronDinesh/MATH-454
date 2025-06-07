@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
+#SBATCH --ntasks-per-node=72
 #SBATCH --cpus-per-task=1
 #SBATCH --time=02:30:00
 #SBATCH --qos=math-454
@@ -10,5 +10,5 @@
 source ./.venv/bin/activate
 
 
-srun --output=./parallel_time.txt ./swe 1 1000 1000 50
+srun --output=./parallel_time.txt ./swe 1 1080 1080 10
 python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames
