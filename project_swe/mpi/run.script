@@ -1,14 +1,16 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=72
+#SBATCH --nodes=2
+#SBATCH --ntasks-per-node=64
 #SBATCH --cpus-per-task=1
 #SBATCH --time=02:30:00
 #SBATCH --qos=math-454
 #SBATCH --account=math-454
 #SBATCH --output=/dev/null
 
-source ./.venv/bin/activate
+#source ./.venv/bin/activate
 
+#8912
 
-srun --output=./parallel_time.txt ./swe 1 1080 1080 10
-python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames
+srun --output=./runs/parallel_time_128_2048.txt ./swe 1 2048 2048 0
+
+#python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames

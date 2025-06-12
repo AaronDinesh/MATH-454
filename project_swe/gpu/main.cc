@@ -26,7 +26,7 @@ int main(int argc, char* argv[]){
 
     auto end = std::chrono::high_resolution_clock::now();
 
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    auto duration = std::chrono::duration<double>(end - start);
     std::cout << "Time taken: " << duration.count() << " s" << std::endl;
   }else if (test_case_id == 2){ 
     // Option 2 - Solving analytical (dummy) tsunami example.
@@ -45,7 +45,7 @@ int main(int argc, char* argv[]){
     start = std::chrono::high_resolution_clock::now();
     solver.solve(Tend, full_log, output_n, output_fname);
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    auto duration = std::chrono::duration<double>(end - start);
     std::cout << "Time taken: " << duration.count() << " s" << std::endl;
   }else if (test_case_id == 3){
     
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]){
     start = std::chrono::high_resolution_clock::now();
     solver.solve(Tend, full_log, output_n, output_fname);
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    auto duration = std::chrono::duration<double>(end - start);
     std::cout << "Time taken: " << duration.count() << " s" << std::endl;
   }else{
     std::cerr << "Invalid test case id: " << test_case_id << std::endl;

@@ -155,10 +155,10 @@ SWESolver::SWESolver(const int test_case_id, const std::size_t nx, const std::si
   }
 }
 
-SWESolver::SWESolver(const std::string &h5_file, const double size_x, const double size_y, MPI_Comm comm)
+SWESolver::SWESolver(const std::string &h5_file, const double size_x, const double size_y, MPI_Comm comm) :
   size_x_(size_x), size_y_(size_y), reflective_(false)
 {
-  this->init_from_HDF5_file(h5_file);  
+  this->init_from_HDF5_file(h5_file, comm);  
 }
 
 void SWESolver::init_from_HDF5_file(const std::string &h5_file, MPI_Comm comm){
@@ -204,11 +204,11 @@ void SWESolver::init_from_HDF5_file(const std::string &h5_file, MPI_Comm comm){
   add_ghost(zdy_);
 
   std::vector<double> a, b, c, d;
-  if rank == 0{
-    read_2d_array_from_DF5(h5_file, "h0", this->a, this->nx_, this->ny_);
-    read_2d_array_from_DF5(h5_file, "hu0", this->b, this->nx_, this->ny_);
-    read_2d_array_from_DF5(h5_file, "hv0", this->c, this->nx_, this->ny_);
-    read_2d_array_from_DF5(h5_file, "topography", this->d, this->nx_, this->ny_);
+  if(rank == 0){
+    read_2d_array_from_DF5(h5_file, "h0", a, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "hu0", b, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "hv0", c, this->nx_, this->ny_);
+    read_2d_array_from_DF5(h5_file, "topography", d, this->nx_, this->ny_);
   }
 
     // 7. Scatter blocks from root
@@ -223,8 +223,8 @@ void SWESolver::init_from_HDF5_file(const std::string &h5_file, MPI_Comm comm){
         int oy = coords[1] * local_ny;
 
         std::vector<double> tmp(local_nx * local_ny);
-        for (int j = 0; j < local_ny; ++j){
-          for (int i = 0; i < local_nx; ++i){
+        for (size_t j = 0; j < local_ny; ++j){
+          for (size_t i = 0; i < local_nx; ++i){
             tmp[j * local_nx + i] = full_data[(oy + j) * nx_ + (ox + i)];
           }
         }
@@ -239,8 +239,8 @@ void SWESolver::init_from_HDF5_file(const std::string &h5_file, MPI_Comm comm){
     }
 
     // Copy into center of ghosted array
-    for (int j = 0; j < local_ny; ++j){
-      for (int i = 0; i < local_nx; ++i){
+    for (size_t j = 0; j < local_ny; ++j){
+      for (size_t i = 0; i < local_nx; ++i){
         at(local_data, i+1, j+1) = local_block[j * local_nx + i];
       }
     }

@@ -1,0 +1,2 @@
+Finished solving SWE.
+Time taken: 45.6691 s
