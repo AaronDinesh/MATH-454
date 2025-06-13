@@ -15,3 +15,8 @@ project_swe/data/*
 **/output_files/
 **/.venv/
 **/*.mp4
+**/*.perf
+**/*.out
+**/*.err
+**/*.slurm
+

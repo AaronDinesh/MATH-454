@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=64
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=1
 #SBATCH --time=02:30:00
 #SBATCH --qos=math-454
@@ -11,6 +11,6 @@
 
 #8912
 
-srun --output=./runs/parallel_time_128_2048.txt ./swe 1 2048 2048 0
+srun --output=./runs/.txt ./swe 1 512 512 0
 
 #python ./visualize_solution.py --frame -1 --vis-type 3d --path output_files --basename water_drops --output frames

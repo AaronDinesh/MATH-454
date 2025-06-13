@@ -2,16 +2,16 @@
 
 # Thread block configurations to test
 CONFIGS=(
-    "2 2"
-    "4 4"
-    "8 8"
-    "16 16"
-    "32 32"
-    "64 64"
-    "128 128"
-    "256 256"
-    "512 512"
-    "1024 1024"
+    "1 1"
+    # "4 4"
+    # "8 8"
+    # "16 16"
+    # "32 32"
+    # "64 64"
+    # "128 128"
+    # "256 256"
+    # "512 512"
+    # "1024 1024"
 )
 
 # Grid sizes for test case 1
@@ -30,7 +30,7 @@ MAX_JOBS=5  # Set this to your SLURM submission quota
 CHECK_INTERVAL=5  # seconds to wait before checking again
 
 # Output CSV
-OUTPUT_CSV="scaling_results.csv"
+OUTPUT_CSV="scaling_results_serial.csv"
 echo "TestCase,GridSize,ThreadsX,ThreadsY,TotalThreads,TimeSeconds" > $OUTPUT_CSV
 
 # Submit batch jobs
